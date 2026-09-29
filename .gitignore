@@ -1,0 +1,7 @@
+supabase/.branches
+supabase/functions/.env*
+!supabase/functions/.env.example
+supabase/.temp
+web/config.local.js
+web/.vercel
+brag-output/snapshots/

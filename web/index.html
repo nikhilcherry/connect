@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Connect</title>
+<meta name="description" content="Reach this car's owner without sharing phone numbers.">
+<meta name="theme-color" content="#EEEDF8">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%23171335'/><path d='M27 37l10-10M24 31l-3 3a6 6 0 0 0 8.5 8.5l3-3M40 33l3-3a6 6 0 0 0-8.5-8.5l-3 3' stroke='white' stroke-width='4' fill='none' stroke-linecap='square'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  /* Dispatch Periwinkle, same tokens as the app (app/lib/theme.dart). */
+  :root {
+    --ground: #EEEDF8; --card: #FFFFFF; --line: #DAD7EC; --line-strong: #CBC7E2;
+    --ink: #171335; --muted: #575279; --on-dark: #FFFFFF; --on-dark-muted: #C4BFDE;
+    --violet: #5A45C9; --violet-deep: #3C2C93; --violet-tint: #E2DEF7;
+    --amber: #D9540C; --amber-text: #A63D05; --amber-tint: #FBE9DD;
+    --success: #16775B; --success-tint: #E2F1EC;
+    --error: #BD2049; --error-tint: #F8E1E7;
+    --ease: cubic-bezier(0.2, 0, 0, 1);
+    --display: "Space Grotesk", "Noto Sans Devanagari", system-ui, sans-serif;
+    --ui: Manrope, "Noto Sans Devanagari", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--ground); color: var(--ink); font: 15px/1.65 var(--ui); font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
+  main { max-width: 480px; margin: 0 auto; padding: 20px 16px calc(32px + env(safe-area-inset-bottom)); }
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  .brand { display: flex; align-items: center; gap: 10px; font: 700 17px/1 var(--display); letter-spacing: -0.01em; }
+  .brand svg { width: 32px; height: 32px; }
+  svg.i { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: square; stroke-linejoin: miter; flex: none; }
+  .lang { min-height: 44px; border: 1px solid var(--line); background: var(--card); color: var(--violet); border-radius: 10px; padding: 0 34px 0 14px; font: 600 15px var(--ui); cursor: pointer; appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235A45C9' stroke-width='2' stroke-linecap='square'><path d='M7 10l5 5 5-5'/></svg>"); background-repeat: no-repeat; background-position: right 10px center; background-size: 18px; }
+  .lang:focus-visible { outline: 1px solid var(--violet); box-shadow: 0 0 0 3px var(--violet-tint); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin-bottom: 12px; }
+  .label { font: 600 11px/1 var(--ui); letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; }
+  h1 { font: 700 26px/1.15 var(--display); letter-spacing: -0.02em; margin: 0 0 4px; }
+  h2 { font: 600 17px/1.3 var(--ui); margin: 0 0 14px; }
+  p { margin: 0; }
+  .muted { color: var(--muted); font-size: 13px; line-height: 1.4; }
+  .car { display: flex; gap: 14px; align-items: center; }
+  .car-icon { width: 52px; height: 52px; border-radius: 10px; background: var(--ground); color: var(--muted); display: grid; place-items: center; flex: none; }
+  .privacy { display: flex; gap: 8px; align-items: center; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 13px; line-height: 1.4; color: var(--muted); }
+  .privacy svg.i { width: 18px; height: 18px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .reason { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 10px; padding: 14px 12px; font: 600 15px/1.3 var(--ui); text-align: left; min-height: 84px; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; transition: border-color 140ms var(--ease), background-color 140ms var(--ease), transform 140ms var(--ease); }
+  .reason:active { transform: scale(0.97); }
+  .reason svg.i { color: var(--muted); }
+  .reason[aria-pressed="true"] { border-color: var(--violet); background: var(--violet-tint); color: var(--violet-deep); }
+  .reason[aria-pressed="true"] svg.i { color: var(--violet); }
+  .reason.urgent[aria-pressed="true"] { border-color: var(--error); background: var(--error-tint); color: var(--error); }
+  .reason.urgent[aria-pressed="true"] svg.i { color: var(--error); }
+  label { display: block; font: 600 11px/1 var(--ui); letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); margin: 22px 0 8px; }
+  input, textarea { width: 100%; font: 400 16px/1.4 var(--ui); color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; transition: border-color 140ms var(--ease), box-shadow 140ms var(--ease); }
+  input::placeholder, textarea::placeholder { color: var(--muted); }
+  input:focus, textarea:focus, input:focus-visible, textarea:focus-visible { outline: none; border-color: var(--violet); box-shadow: 0 0 0 3px var(--violet-tint); }
+  .plate { text-transform: uppercase; letter-spacing: 0.3em; font: 700 26px/1.2 var(--display); text-align: center; }
+  textarea { resize: none; min-height: 84px; }
+  .btn { width: 100%; min-height: 52px; border: 0; border-radius: 10px; padding: 16px 28px; font: 700 15px/1.2 var(--ui); cursor: pointer; background: var(--violet); color: var(--on-dark); margin-top: 20px; transition: background-color 140ms var(--ease); }
+  .btn { transition: background-color 140ms var(--ease), transform 140ms var(--ease); }
+  .btn:active { background: var(--violet-deep); transform: scale(0.98); }
+  .btn[disabled] { background: var(--violet-tint); color: var(--muted); cursor: not-allowed; }
+  button:focus-visible, a:focus-visible { outline: 1px solid var(--violet); box-shadow: 0 0 0 3px var(--violet-tint); }
+  .sos { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; background: var(--error-tint); color: var(--error); text-decoration: none; border-radius: 10px; padding: 14px; font: 700 15px var(--ui); margin-top: 12px; }
+  .error { color: var(--error); font-size: 13px; line-height: 1.4; margin-top: 10px; min-height: 1em; }
+  .status { display: flex; align-items: center; gap: 10px; font: 600 17px/1.3 var(--ui); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--violet); flex: none; animation: pulse 1.6s ease-in-out infinite; }
+  .dot.on_my_way { background: var(--violet); }
+  .dot.resolved { background: var(--success); animation: none; }
+  @keyframes pulse { 50% { opacity: 0.35; } }
+  /* Motion, same rules as the app (widgets/motion.dart): one curve, a few
+     pixels of travel, content arriving in order. */
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+  @keyframes from-left { from { opacity: 0; transform: translate(-12px, 6px); } }
+  @keyframes from-right { from { opacity: 0; transform: translate(12px, 6px); } }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  .enter > * { animation: rise 240ms var(--ease) both; }
+  .enter > *:nth-child(2) { animation-delay: 35ms; }
+  .enter > *:nth-child(3) { animation-delay: 70ms; }
+  .enter > *:nth-child(4) { animation-delay: 105ms; }
+  .grid .reason { animation: rise 240ms var(--ease) both; }
+  .grid .reason:nth-child(2) { animation-delay: 35ms; } .grid .reason:nth-child(3) { animation-delay: 70ms; }
+  .grid .reason:nth-child(4) { animation-delay: 105ms; } .grid .reason:nth-child(5) { animation-delay: 140ms; }
+  .grid .reason:nth-child(6) { animation-delay: 175ms; }
+  .grid.settled .reason { animation: none; }
+  .msg.new.owner { animation: from-left 240ms var(--ease) both; }
+  .msg.new.scanner { animation: from-right 240ms var(--ease) both; }
+  .reveal { animation: rise 240ms var(--ease) both; }
+  .check { width: 28px; height: 28px; flex: none; }
+  .check path { stroke-dasharray: 24; stroke-dashoffset: 24; animation: draw 520ms var(--ease) 80ms forwards; }
+  @media (prefers-reduced-motion: reduce) {
+    .dot { animation: none; } * { transition: none !important; animation: none !important; }
+    .check path { stroke-dashoffset: 0; }
+  }
+  .msgs { display: flex; flex-direction: column; gap: 8px; margin: 18px 0 4px; }
+  .msg { max-width: 82%; padding: 10px 14px; border-radius: 12px; font-size: 15px; line-height: 1.45; overflow-wrap: anywhere; }
+  .msg.scanner { align-self: flex-end; background: var(--ink); color: var(--on-dark); border-bottom-right-radius: 4px; }
+  .msg.owner { align-self: flex-start; background: var(--card); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+  .quick { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .chip { min-height: 36px; border: 1px solid var(--line); background: var(--card); color: var(--violet); border-radius: 6px; padding: 6px 12px; font: 600 13px var(--ui); cursor: pointer; }
+  .chip:active { background: var(--violet-tint); }
+  .row { display: flex; gap: 8px; margin-top: 12px; }
+  .row input { flex: 1; min-width: 0; }
+  .row .btn { width: auto; margin: 0; padding: 0 20px; }
+  .backby { display: flex; gap: 12px; align-items: center; background: var(--ground); border-radius: 12px; padding: 12px 14px; margin-top: 14px; }
+  .backby svg.i { color: var(--violet); }
+  .backby b { display: block; font-weight: 600; line-height: 1.35; }
+  .backby .time { font-family: var(--display); font-weight: 700; }
+  .medical { display: flex; gap: 12px; align-items: flex-start; background: var(--error-tint); color: var(--error); border-radius: 12px; padding: 12px 14px; margin-top: 14px; }
+  .medical b { display: block; font-weight: 600; line-height: 1.35; }
+  .medical .blood { font-family: var(--display); font-weight: 700; }
+  .photo-row { display: flex; gap: 12px; align-items: center; margin-top: 8px; }
+  .photo-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; border: 1px solid var(--line); background: var(--card); color: var(--violet); border-radius: 10px; padding: 0 14px; font: 600 15px var(--ui); cursor: pointer; }
+  .photo-btn svg.i { width: 20px; height: 20px; }
+  .thumb { position: relative; width: 64px; height: 64px; border-radius: 10px; overflow: hidden; flex: none; animation: rise 240ms var(--ease) both; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb button { position: absolute; top: 2px; right: 2px; width: 24px; height: 24px; border: 0; border-radius: 6px; background: rgba(23,19,53,0.72); color: #fff; font: 700 14px/1 var(--ui); cursor: pointer; }
+  footer { text-align: center; margin-top: 28px; font-size: 13px; line-height: 1.6; color: var(--muted); }
+  footer a { color: var(--violet); font-weight: 600; text-decoration: none; }
+  .hidden { display: none !important; }
+  .center { text-align: center; padding: 32px 20px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#171335"/><path d="M27 37l10-10M24 31l-3 3a6 6 0 0 0 8.5 8.5l3-3M40 33l3-3a6 6 0 0 0-8.5-8.5l-3 3" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="square"/></svg>
+      Connect
+    </div>
+    <select class="lang" id="lang" aria-label="Language">
+      <option value="en">English</option><option value="hi">हिन्दी</option><option value="kn">ಕನ್ನಡ</option><option value="ta">தமிழ்</option>
+    </select>
+  </header>
+
+  <section id="v-loading" class="card center"><p class="muted" data-t="loading"></p></section>
+  <section id="v-missing" class="card center hidden">
+    <h1 data-t="missingTitle"></h1>
+    <p class="muted" data-t="missingBody"></p>
+  </section>
+
+  <section id="v-compose" class="hidden">
+    <div class="card">
+      <div class="car">
+        <div class="car-icon" aria-hidden="true">
+          <svg class="i" viewBox="0 0 24 24"><path d="M5 17h14M3 13l2-6h14l2 6v4H3z"/><path d="M6 17v2M18 17v2M7 13h.01M17 13h.01"/></svg>
+        </div>
+        <div>
+          <p class="label" data-t="carLabel" style="margin-bottom:8px"></p>
+          <h1 id="car-name"></h1>
+          <p class="muted" data-t="carSub"></p>
+        </div>
+      </div>
+      <div class="privacy">
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+        <span data-t="privacy"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 data-t="whatsUp"></h2>
+      <div class="grid" id="reasons" role="group"></div>
+      <a id="sos" class="sos hidden" href="tel:112"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-3 2a11 11 0 0 0 5 5l2-3 5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg><span data-t="call112"></span></a>
+
+      <label for="plate" data-t="plateLabel"></label>
+      <input id="plate" class="plate" inputmode="text" autocomplete="off" autocapitalize="characters" maxlength="4" placeholder="1234">
+      <p class="muted" style="margin-top:6px" data-t="plateHelp"></p>
+
+      <label for="note" data-t="noteLabel"></label>
+      <textarea id="note" maxlength="280"></textarea>
+
+      <label data-t="photoLabel"></label>
+      <div class="photo-row">
+        <button type="button" class="photo-btn" id="photo-btn"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h4l2-3h6l2 3h4v13H3z"/><circle cx="12" cy="13" r="4"/></svg><span data-t="photoAdd"></span></button>
+        <div class="thumb hidden" id="thumb"><img id="thumb-img" alt=""><button type="button" id="photo-clear" aria-label="Remove photo">×</button></div>
+        <input type="file" id="photo" accept="image/*" capture="environment" class="hidden">
+      </div>
+      <p class="muted" style="margin-top:6px" data-t="photoHelp"></p>
+
+      <button id="send" class="btn" type="button" disabled data-t="send"></button>
+      <p class="error" id="compose-error" role="alert"></p>
+    </div>
+  </section>
+
+  <section id="v-thread" class="hidden">
+    <div class="card">
+      <div class="status"><span class="dot" id="dot"></span><svg class="check hidden" id="check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="var(--success)" stroke-width="2.5" stroke-linecap="square"/></svg><span id="status-text"></span></div>
+      <p class="muted" id="status-sub" style="margin-top:6px"></p>
+      <div class="medical hidden" id="medical"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15"/><path d="M12 9v7M8.5 12.5h7M9 5V3h6v2"/></svg><div><b id="medical-title"></b><span id="medical-blood"></span><span id="medical-note" style="display:block"></span><span class="muted" id="medical-tell" style="color:var(--error)"></span></div></div>
+      <div class="backby hidden" id="back-by"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><div><b id="back-by-time"></b><span class="muted" id="back-by-note"></span></div></div>
+      <div class="msgs" id="msgs" aria-live="polite"></div>
+      <div id="reply-box">
+        <div class="quick" id="quick"></div>
+        <div class="row">
+          <input id="reply" maxlength="280" data-tp="replyPh">
+          <button id="reply-send" class="btn" type="button" data-t="sendShort"></button>
+        </div>
+        <p class="error" id="thread-error" role="alert"></p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span data-t="footer"></span> <a id="get-app" href="/get" data-t="getApp"></a>
+  </footer>
+</main>
+
+<script src="/config.js"></script>
+<script>
+(() => {
+  const CFG = window.CONNECT_CONFIG || {};
+  const ENDPOINT = `${CFG.supabaseUrl}/functions/v1/scan`;
+
+  const STR = {
+    en: {
+      loading: "Loading…",
+      missingTitle: "Tag not found",
+      missingBody: "This Connect tag is inactive or the link is incomplete. Check the code printed on the sticker.",
+      carSub: "Protected by Connect",
+      carLabel: "You scanned",
+      privacy: "Neither of you sees the other's phone number.",
+      whatsUp: "What's the problem?",
+      blocking: "Blocking my car", lights_on: "Lights are on", towing: "Being towed",
+      window_open: "Window or door open", accident: "Accident or damage", other: "Something else",
+      call112: "Emergency? Call 112 first",
+      plateLabel: "Last 4 characters of the number plate",
+      plateHelp: "This shows you're at the car. Nothing else is shared.",
+      noteLabel: "Add a note (optional)",
+      send: "Notify the owner",
+      sendShort: "Send",
+      sending: "Sending…",
+      status_open: "Owner notified", status_on_my_way: "Owner is on the way", status_resolved: "Marked as sorted",
+      sub_open: "Keep this page open. Replies appear here.",
+      sub_on_my_way: "They've seen your message.",
+      sub_resolved: "Thanks for helping out.",
+      replyPh: "Reply to the owner…",
+      q1: "I'm waiting near the car", q2: "Please hurry", q3: "Thanks!",
+      backBy: "The owner said they'll be back by {t}",
+      footer: "Protect your own car for free.", getApp: "Get Connect",
+      err_plate_mismatch: "Those characters don't match this car's plate.",
+      err_too_many_attempts: "Too many tries. Please wait 10 minutes.",
+      err_rate_limited: "Too many messages right now. Please wait a few minutes.",
+      err_resolved: "The owner has marked this as sorted.",
+      err_generic: "Couldn't send. Check your connection and try again.",
+      err_bad_photo: "That photo couldn't be sent. Try another one or send without it.",
+      photoLabel: "Photo (optional)", photoAdd: "Add a photo",
+      photoHelp: "Shows the owner what's wrong. Shrunk on your phone first and deleted after 7 days.",
+      medicalTitle: "Medical info the owner shared", medicalBlood: "Blood group", medicalTell: "Tell the paramedics or the 112 operator.",
+    },
+    hi: {
+      loading: "लोड हो रहा है…",
+      missingTitle: "टैग नहीं मिला",
+      missingBody: "यह Connect टैग सक्रिय नहीं है या लिंक अधूरा है। स्टिकर पर छपा कोड जाँचें।",
+      carSub: "Connect द्वारा सुरक्षित",
+      carLabel: "आपने स्कैन किया",
+      privacy: "कोई भी एक-दूसरे का फ़ोन नंबर नहीं देख सकता।",
+      whatsUp: "क्या समस्या है?",
+      blocking: "मेरी गाड़ी रोकी है", lights_on: "लाइट जल रही है", towing: "गाड़ी टो हो रही है",
+      window_open: "खिड़की या दरवाज़ा खुला है", accident: "दुर्घटना या नुकसान", other: "कुछ और",
+      call112: "आपात स्थिति? पहले 112 पर कॉल करें",
+      plateLabel: "नंबर प्लेट के आख़िरी 4 अक्षर",
+      plateHelp: "इससे पता चलता है कि आप गाड़ी के पास हैं। और कुछ साझा नहीं होता।",
+      noteLabel: "कुछ लिखें (वैकल्पिक)",
+      send: "मालिक को सूचित करें",
+      sendShort: "भेजें",
+      sending: "भेजा जा रहा है…",
+      status_open: "मालिक को सूचना भेज दी गई", status_on_my_way: "मालिक आ रहे हैं", status_resolved: "समस्या सुलझ गई",
+      sub_open: "यह पेज खुला रखें। जवाब यहीं दिखेंगे।",
+      sub_on_my_way: "उन्होंने आपका संदेश देख लिया है।",
+      sub_resolved: "मदद करने के लिए धन्यवाद।",
+      replyPh: "मालिक को जवाब दें…",
+      q1: "मैं गाड़ी के पास इंतज़ार कर रहा हूँ", q2: "कृपया जल्दी आइए", q3: "धन्यवाद!",
+      backBy: "मालिक ने बताया है कि वे {t} तक लौटेंगे",
+      footer: "अपनी गाड़ी को मुफ़्त में सुरक्षित करें।", getApp: "Connect पाएँ",
+      err_plate_mismatch: "ये अक्षर इस गाड़ी की नंबर प्लेट से मेल नहीं खाते।",
+      err_too_many_attempts: "बहुत ज़्यादा कोशिशें। 10 मिनट रुकें।",
+      err_rate_limited: "अभी बहुत सारे संदेश। कुछ मिनट रुकें।",
+      err_resolved: "मालिक ने इसे सुलझा हुआ बताया है।",
+      err_generic: "भेजा नहीं जा सका। इंटरनेट जाँचें और फिर कोशिश करें।",
+      err_bad_photo: "वह फ़ोटो नहीं भेजी जा सकी। दूसरी फ़ोटो आज़माएँ या उसके बिना भेजें।",
+      photoLabel: "फ़ोटो (वैकल्पिक)", photoAdd: "फ़ोटो जोड़ें",
+      photoHelp: "मालिक को दिखाता है कि क्या गड़बड़ है। पहले आपके फ़ोन पर छोटी की जाती है और 7 दिन बाद हटा दी जाती है।",
+      medicalTitle: "मालिक की साझा की गई मेडिकल जानकारी", medicalBlood: "ब्लड ग्रुप", medicalTell: "पैरामेडिक्स या 112 ऑपरेटर को बताएँ।",
+    },
+    kn: {
+      loading: "ಲೋಡ್ ಆಗುತ್ತಿದೆ…",
+      missingTitle: "ಟ್ಯಾಗ್ ಸಿಗಲಿಲ್ಲ",
+      missingBody: "ಈ Connect ಟ್ಯಾಗ್ ಸಕ್ರಿಯವಾಗಿಲ್ಲ ಅಥವಾ ಲಿಂಕ್ ಅಪೂರ್ಣವಾಗಿದೆ. ಸ್ಟಿಕ್ಕರ್ ಮೇಲೆ ಮುದ್ರಿಸಿದ ಕೋಡ್ ಪರಿಶೀಲಿಸಿ.",
+      carSub: "Connect ನಿಂದ ರಕ್ಷಿತ",
+      carLabel: "ನೀವು ಸ್ಕ್ಯಾನ್ ಮಾಡಿದ್ದು",
+      privacy: "ಯಾರೂ ಇನ್ನೊಬ್ಬರ ಫೋನ್ ನಂಬರ್ ನೋಡುವುದಿಲ್ಲ.",
+      whatsUp: "ಸಮಸ್ಯೆ ಏನು?",
+      blocking: "ನನ್ನ ಕಾರಿಗೆ ಅಡ್ಡವಾಗಿದೆ", lights_on: "ಲೈಟ್ ಆನ್ ಆಗಿದೆ", towing: "ಟೋ ಮಾಡುತ್ತಿದ್ದಾರೆ",
+      window_open: "ಕಿಟಕಿ ಅಥವಾ ಬಾಗಿಲು ತೆರೆದಿದೆ", accident: "ಅಪಘಾತ ಅಥವಾ ಹಾನಿ", other: "ಬೇರೆ ಏನೋ",
+      call112: "ತುರ್ತು? ಮೊದಲು 112 ಗೆ ಕರೆ ಮಾಡಿ",
+      plateLabel: "ನಂಬರ್ ಪ್ಲೇಟ್‌ನ ಕೊನೆಯ 4 ಅಕ್ಷರಗಳು",
+      plateHelp: "ನೀವು ಕಾರಿನ ಬಳಿ ಇದ್ದೀರಿ ಎಂದು ಇದು ತೋರಿಸುತ್ತದೆ. ಬೇರೇನೂ ಹಂಚಿಕೊಳ್ಳುವುದಿಲ್ಲ.",
+      noteLabel: "ಟಿಪ್ಪಣಿ ಸೇರಿಸಿ (ಐಚ್ಛಿಕ)",
+      send: "ಮಾಲೀಕರಿಗೆ ತಿಳಿಸಿ",
+      sendShort: "ಕಳುಹಿಸಿ",
+      sending: "ಕಳುಹಿಸುತ್ತಿದೆ…",
+      status_open: "ಮಾಲೀಕರಿಗೆ ತಿಳಿಸಲಾಗಿದೆ", status_on_my_way: "ಮಾಲೀಕರು ಬರುತ್ತಿದ್ದಾರೆ", status_resolved: "ಸರಿಯಾಗಿದೆ ಎಂದು ಗುರುತಿಸಲಾಗಿದೆ",
+      sub_open: "ಈ ಪುಟ ತೆರೆದಿಡಿ. ಉತ್ತರಗಳು ಇಲ್ಲಿ ಕಾಣುತ್ತವೆ.",
+      sub_on_my_way: "ಅವರು ನಿಮ್ಮ ಸಂದೇಶ ನೋಡಿದ್ದಾರೆ.",
+      sub_resolved: "ಸಹಾಯ ಮಾಡಿದ್ದಕ್ಕೆ ಧನ್ಯವಾದ.",
+      replyPh: "ಮಾಲೀಕರಿಗೆ ಉತ್ತರಿಸಿ…",
+      q1: "ನಾನು ಕಾರಿನ ಬಳಿ ಕಾಯುತ್ತಿದ್ದೇನೆ", q2: "ದಯವಿಟ್ಟು ಬೇಗ ಬನ್ನಿ", q3: "ಧನ್ಯವಾದ!",
+      backBy: "ಮಾಲೀಕರು {t} ರೊಳಗೆ ಹಿಂತಿರುಗುವುದಾಗಿ ಹೇಳಿದ್ದಾರೆ",
+      footer: "ನಿಮ್ಮ ಕಾರನ್ನು ಉಚಿತವಾಗಿ ರಕ್ಷಿಸಿ.", getApp: "Connect ಪಡೆಯಿರಿ",
+      err_plate_mismatch: "ಈ ಅಕ್ಷರಗಳು ಈ ಕಾರಿನ ಪ್ಲೇಟ್‌ಗೆ ಹೊಂದುವುದಿಲ್ಲ.",
+      err_too_many_attempts: "ತುಂಬಾ ಪ್ರಯತ್ನಗಳು. 10 ನಿಮಿಷ ಕಾಯಿರಿ.",
+      err_rate_limited: "ಈಗ ತುಂಬಾ ಸಂದೇಶಗಳು. ಕೆಲವು ನಿಮಿಷ ಕಾಯಿರಿ.",
+      err_resolved: "ಮಾಲೀಕರು ಇದನ್ನು ಸರಿಯಾಗಿದೆ ಎಂದು ಗುರುತಿಸಿದ್ದಾರೆ.",
+      err_generic: "ಕಳುಹಿಸಲು ಆಗಲಿಲ್ಲ. ಇಂಟರ್ನೆಟ್ ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      err_bad_photo: "ಆ ಫೋಟೋ ಕಳುಹಿಸಲು ಆಗಲಿಲ್ಲ. ಬೇರೆ ಫೋಟೋ ಪ್ರಯತ್ನಿಸಿ ಅಥವಾ ಅದಿಲ್ಲದೆ ಕಳುಹಿಸಿ.",
+      photoLabel: "ಫೋಟೋ (ಐಚ್ಛಿಕ)", photoAdd: "ಫೋಟೋ ಸೇರಿಸಿ",
+      photoHelp: "ಏನು ತೊಂದರೆ ಎಂದು ಮಾಲೀಕರಿಗೆ ತೋರಿಸುತ್ತದೆ. ಮೊದಲು ನಿಮ್ಮ ಫೋನ್‌ನಲ್ಲಿ ಚಿಕ್ಕದು ಮಾಡಲಾಗುತ್ತದೆ ಮತ್ತು 7 ದಿನಗಳ ನಂತರ ಅಳಿಸಲಾಗುತ್ತದೆ.",
+      medicalTitle: "ಮಾಲೀಕರು ಹಂಚಿಕೊಂಡ ವೈದ್ಯಕೀಯ ಮಾಹಿತಿ", medicalBlood: "ರಕ್ತದ ಗುಂಪು", medicalTell: "ಪ್ಯಾರಾಮೆಡಿಕ್‌ಗಳಿಗೆ ಅಥವಾ 112 ಆಪರೇಟರ್‌ಗೆ ತಿಳಿಸಿ.",
+    },
+    ta: {
+      loading: "ஏற்றுகிறது…",
+      missingTitle: "டேக் கிடைக்கவில்லை",
+      missingBody: "இந்த Connect டேக் செயலில் இல்லை அல்லது இணைப்பு முழுமையாக இல்லை. ஸ்டிக்கரில் அச்சிடப்பட்ட குறியீட்டைச் சரிபாருங்கள்.",
+      carSub: "Connect ஆல் பாதுகாக்கப்படுகிறது",
+      carLabel: "நீங்கள் ஸ்கேன் செய்தது",
+      privacy: "யாரும் மற்றவரின் போன் எண்ணைப் பார்க்க மாட்டார்கள்.",
+      whatsUp: "என்ன பிரச்சனை?",
+      blocking: "என் காரை மறிக்கிறது", lights_on: "விளக்கு எரிகிறது", towing: "இழுத்துச் செல்லப்படுகிறது",
+      window_open: "ஜன்னல் அல்லது கதவு திறந்துள்ளது", accident: "விபத்து அல்லது சேதம்", other: "வேறு ஏதாவது",
+      call112: "அவசரமா? முதலில் 112 ஐ அழையுங்கள்",
+      plateLabel: "நம்பர் பிளேட்டின் கடைசி 4 எழுத்துகள்",
+      plateHelp: "நீங்கள் காரின் அருகில் இருப்பதை இது காட்டுகிறது. வேறு எதுவும் பகிரப்படாது.",
+      noteLabel: "குறிப்பு சேர்க்கவும் (விருப்பம்)",
+      send: "உரிமையாளருக்குத் தெரிவி",
+      sendShort: "அனுப்பு",
+      sending: "அனுப்புகிறது…",
+      status_open: "உரிமையாளருக்குத் தெரிவிக்கப்பட்டது", status_on_my_way: "உரிமையாளர் வருகிறார்", status_resolved: "சரியானது எனக் குறிக்கப்பட்டது",
+      sub_open: "இந்தப் பக்கத்தைத் திறந்து வையுங்கள். பதில்கள் இங்கே தோன்றும்.",
+      sub_on_my_way: "அவர்கள் உங்கள் செய்தியைப் பார்த்துவிட்டார்கள்.",
+      sub_resolved: "உதவியதற்கு நன்றி.",
+      replyPh: "உரிமையாளருக்குப் பதிலளி…",
+      q1: "நான் காரின் அருகில் காத்திருக்கிறேன்", q2: "தயவுசெய்து சீக்கிரம் வாருங்கள்", q3: "நன்றி!",
+      backBy: "உரிமையாளர் {t} க்குள் திரும்புவதாகச் சொன்னார்",
+      footer: "உங்கள் காரை இலவசமாகப் பாதுகாக்கவும்.", getApp: "Connect பெறுங்கள்",
+      err_plate_mismatch: "இந்த எழுத்துகள் இந்தக் காரின் பிளேட்டுடன் பொருந்தவில்லை.",
+      err_too_many_attempts: "அதிக முயற்சிகள். 10 நிமிடம் காத்திருங்கள்.",
+      err_rate_limited: "இப்போது அதிகச் செய்திகள். சில நிமிடங்கள் காத்திருங்கள்.",
+      err_resolved: "உரிமையாளர் இதைச் சரியானது எனக் குறித்துள்ளார்.",
+      err_generic: "அனுப்ப முடியவில்லை. இணையத்தைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.",
+      err_bad_photo: "அந்தப் புகைப்படத்தை அனுப்ப முடியவில்லை. வேறொன்றை முயற்சிக்கவும் அல்லது அது இல்லாமல் அனுப்பவும்.",
+      photoLabel: "புகைப்படம் (விருப்பம்)", photoAdd: "புகைப்படம் சேர்",
+      photoHelp: "என்ன பிரச்சனை என்று உரிமையாளருக்குக் காட்டும். முதலில் உங்கள் போனில் சுருக்கப்பட்டு 7 நாட்களுக்குப் பிறகு நீக்கப்படும்.",
+      medicalTitle: "உரிமையாளர் பகிர்ந்த மருத்துவத் தகவல்", medicalBlood: "இரத்த வகை", medicalTell: "மருத்துவ உதவியாளர்கள் அல்லது 112 ஆபரேட்டரிடம் சொல்லுங்கள்.",
+    },
+  };
+  const LANGS = Object.keys(STR);
+  const LOCALE = { en: "en-IN", hi: "hi-IN", kn: "kn-IN", ta: "ta-IN" };
+
+  // 24px line icons, 2px stroke, square caps (drawn by .i).
+  const ICON = {
+    blocking: '<path d="M5 17h14M3 13l2-6h14l2 6v4H3z"/><path d="M4 4l16 16"/>',
+    lights_on: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5V16h8v-2.5A6 6 0 0 0 12 3z"/>',
+    towing: '<path d="M3 17h10M3 13l2-5h8l2 5v4"/><path d="M15 13h3l3-7M21 6v4"/>',
+    window_open: '<rect x="5" y="3" width="14" height="18"/><path d="M5 12h14M12 3v18"/>',
+    accident: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/>',
+    other: '<path d="M4 4h16v12H9l-5 4z"/>',
+  };
+  const REASONS = ["blocking", "lights_on", "towing", "window_open", "accident", "other"];
+
+  const $ = (id) => document.getElementById(id);
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+  };
+
+  // Saved choice, else the phone's language if we have it, else English.
+  const saved = store.get("dlc-lang");
+  const browser = (navigator.language || "en").slice(0, 2);
+  let lang = LANGS.includes(saved) ? saved : LANGS.includes(browser) ? browser : "en";
+  let code = null, kind = null, thread = null, pollTimer = null, lastStatus = null, lastBackBy = null, lastMedical = null, photo = null;
+  const t = (k) => STR[lang][k] ?? STR.en[k] ?? k;
+  const errText = (c) => (STR.en[`err_${c}`] ? t(`err_${c}`) : t("err_generic"));
+
+  function applyLang() {
+    document.documentElement.lang = lang;
+    $("lang").value = lang;
+    document.querySelectorAll("[data-t]").forEach((el) => { el.textContent = t(el.dataset.t); });
+    document.querySelectorAll("[data-tp]").forEach((el) => { el.placeholder = t(el.dataset.tp); });
+    renderReasons();
+    renderQuick();
+    if (thread && lastStatus) renderStatus(lastStatus);
+    if (thread) renderBackBy(lastBackBy);
+    if (thread) renderMedical(lastMedical);
+  }
+
+  // Views fade in and rise, children in order (the app's Reveal).
+  function show(view) {
+    ["v-loading", "v-missing", "v-compose", "v-thread"].forEach((v) => {
+      const el = $(v);
+      const on = v === view;
+      if (on && el.classList.contains("hidden")) {
+        el.classList.remove("enter");
+        void el.offsetWidth;
+        el.classList.add("enter");
+      }
+      el.classList.toggle("hidden", !on);
+    });
+  }
+
+  async function call(payload) {
+    const res = await fetch(ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: CFG.anonKey || "" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw Object.assign(new Error(data.error || "generic"), { code: data.error || "generic" });
+    return data;
+  }
+
+  function renderReasons() {
+    const box = $("reasons");
+    // Stagger in once; re-renders (a tap, a language switch) stay still.
+    if (box.childElementCount) box.classList.add("settled");
+    box.innerHTML = "";
+    for (const k of REASONS) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "reason" + (k === "accident" || k === "towing" ? " urgent" : "");
+      b.setAttribute("aria-pressed", String(kind === k));
+      b.innerHTML = `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICON[k]}</svg><span></span>`;
+      b.lastChild.textContent = t(k);
+      b.onclick = () => {
+        kind = k;
+        renderReasons();
+        validate();
+        $("sos").classList.toggle("hidden", k !== "accident");
+      };
+      box.appendChild(b);
+    }
+  }
+
+  function validate() {
+    const plate = $("plate").value.replace(/[^a-z0-9]/gi, "");
+    $("send").disabled = !(kind && plate.length === 4);
+  }
+
+  async function send() {
+    const btn = $("send");
+    btn.disabled = true;
+    btn.textContent = t("sending");
+    $("compose-error").textContent = "";
+    try {
+      const r = await call({ action: "alert", code, kind, plate_last4: $("plate").value, note: $("note").value, photo });
+      thread = { alert_id: r.alert_id, token: r.token };
+      store.set(`dlc-thread-${code}`, JSON.stringify({ ...thread, at: Date.now() }));
+      openThread();
+    } catch (e) {
+      $("compose-error").textContent = errText(e.code);
+      btn.textContent = t("send");
+      validate();
+    }
+  }
+
+  function renderStatus(status) {
+    const changed = lastStatus !== status;
+    lastStatus = status;
+    $("dot").className = `dot ${status}`;
+    $("dot").classList.toggle("hidden", status === "resolved");
+    $("check").classList.toggle("hidden", status !== "resolved");
+    if (changed) {
+      for (const id of ["status-text", "status-sub"]) {
+        const el = $(id);
+        el.classList.remove("reveal");
+        void el.offsetWidth;
+        el.classList.add("reveal");
+      }
+    }
+    $("status-text").textContent = t(`status_${status}`);
+    $("status-sub").textContent = t(`sub_${status}`);
+    $("reply-box").classList.toggle("hidden", status === "resolved");
+  }
+
+  // Set by the owner in the app ("back by 6:30"). The server only sends it to
+  // someone who passed the plate check, and drops it once the time has passed.
+  function renderBackBy(s) {
+    lastBackBy = s;
+    const show = !!(s && s.back_at && new Date(s.back_at) > new Date() && lastStatus !== "resolved");
+    $("back-by").classList.toggle("hidden", !show);
+    if (!show) return;
+    const time = new Date(s.back_at).toLocaleTimeString(LOCALE[lang], { hour: "numeric", minute: "2-digit" });
+    const [before, after] = t("backBy").split("{t}");
+    const b = $("back-by-time");
+    b.textContent = before;
+    const span = document.createElement("span");
+    span.className = "time";
+    span.textContent = time;
+    b.append(span, after);
+    $("back-by-note").textContent = s.note ? `“${s.note}”` : "";
+  }
+
+  // Shared by the owner for accident reports only; the server decides.
+  function renderMedical(m) {
+    lastMedical = m;
+    const show = !!(m && (m.blood_group || m.note));
+    $("medical").classList.toggle("hidden", !show);
+    if (!show) return;
+    $("medical-title").textContent = t("medicalTitle");
+    const blood = $("medical-blood");
+    blood.textContent = "";
+    if (m.blood_group) {
+      const b = document.createElement("span");
+      b.className = "blood";
+      b.textContent = m.blood_group;
+      blood.append(`${t("medicalBlood")} `, b);
+    }
+    $("medical-note").textContent = m.note || "";
+    $("medical-tell").textContent = t("medicalTell");
+  }
+
+  function renderMessages(r) {
+    const box = $("msgs");
+    // The sender's own first message: their note, or the reason they picked.
+    const opener = r.kind ? [{ sender: "scanner", body: r.note || t(r.kind) }] : [];
+    const msgs = [...opener, ...(r.messages || [])];
+    const rebuild = box.dataset.lang !== lang || box.childElementCount > msgs.length;
+    if (!rebuild && box.childElementCount === msgs.length) return;
+    // Existing bubbles stay put; only new arrivals slide in from their side.
+    const first = rebuild || !box.dataset.lang;
+    if (rebuild) box.innerHTML = "";
+    box.dataset.lang = lang;
+    for (const m of msgs.slice(box.childElementCount)) {
+      const d = document.createElement("div");
+      d.className = `msg ${m.sender}${first ? "" : " new"}`;
+      d.textContent = m.body;
+      box.appendChild(d);
+    }
+    window.scrollTo({ top: document.body.scrollHeight, behavior: first ? "auto" : "smooth" });
+  }
+
+  function renderQuick() {
+    const box = $("quick");
+    box.innerHTML = "";
+    for (const k of ["q1", "q2", "q3"]) {
+      const c = document.createElement("button");
+      c.type = "button";
+      c.className = "chip";
+      c.textContent = t(k);
+      c.onclick = () => reply(t(k));
+      box.appendChild(c);
+    }
+  }
+
+  async function poll() {
+    try {
+      const r = await call({ action: "thread", ...thread });
+      renderStatus(r.status);
+      renderBackBy(r.owner_status);
+      renderMedical(r.medical);
+      renderMessages(r);
+      if (r.status === "resolved") { clearInterval(pollTimer); pollTimer = null; }
+    } catch { /* transient; the next tick retries */ }
+  }
+
+  function openThread() {
+    show("v-thread");
+    renderStatus("open");
+    poll();
+    clearInterval(pollTimer);
+    pollTimer = setInterval(() => { if (!document.hidden) poll(); }, 4000);
+  }
+
+  async function reply(text) {
+    const body = (text ?? $("reply").value).trim();
+    if (!body) return;
+    $("thread-error").textContent = "";
+    try {
+      await call({ action: "reply", ...thread, body });
+      if (text === undefined) $("reply").value = "";
+      poll();
+    } catch (e) {
+      $("thread-error").textContent = errText(e.code);
+    }
+  }
+
+  // Shrinks a camera photo to <= 1280 px and ~600 KB of JPEG before it
+  // leaves the phone; the server rejects anything over 700 KB.
+  async function shrink(file) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((ok, fail) => {
+        const i = new Image();
+        i.onload = () => ok(i);
+        i.onerror = fail;
+        i.src = url;
+      });
+      const scale = Math.min(1, 1280 / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.naturalWidth * scale);
+      c.height = Math.round(img.naturalHeight * scale);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      for (const q of [0.72, 0.6, 0.45, 0.3]) {
+        const data = c.toDataURL("image/jpeg", q);
+        if (data.length * 0.75 < 600 * 1024) return data;
+      }
+      return null;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  async function pickPhoto(e) {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    $("compose-error").textContent = "";
+    try {
+      photo = await shrink(file);
+    } catch {
+      photo = null;
+    }
+    if (!photo) {
+      $("compose-error").textContent = t("err_bad_photo");
+      return;
+    }
+    $("thumb-img").src = photo;
+    $("thumb").classList.remove("hidden");
+  }
+
+  function clearPhoto() {
+    photo = null;
+    $("thumb").classList.add("hidden");
+    $("thumb-img").removeAttribute("src");
+  }
+
+  function readCode() {
+    const q = new URLSearchParams(location.search).get("c");
+    const path = location.pathname.match(/\/t\/([A-Za-z0-9]{8})\/?$/);
+    return (q || (path && path[1]) || "").toUpperCase();
+  }
+
+  async function init() {
+    applyLang();
+    $("lang").onchange = (e) => { lang = e.target.value; store.set("dlc-lang", lang); applyLang(); };
+    $("photo-btn").onclick = () => $("photo").click();
+    $("photo").onchange = pickPhoto;
+    $("photo-clear").onclick = clearPhoto;
+    $("plate").oninput = validate;
+    $("send").onclick = send;
+    $("reply-send").onclick = () => reply();
+    $("reply").onkeydown = (e) => { if (e.key === "Enter") reply(); };
+
+    code = readCode();
+    if (!/^[A-Z0-9]{8}$/.test(code)) return show("v-missing");
+
+    // Coming back to the page within 6 hours resumes the conversation.
+    try {
+      const saved = JSON.parse(store.get(`dlc-thread-${code}`) || "null");
+      if (saved && Date.now() - saved.at < 6 * 3600e3) thread = saved;
+    } catch {}
+
+    try {
+      const car = await call({ action: "lookup", code });
+      $("car-name").textContent = [car.colour, car.make, car.model].filter(Boolean).join(" ");
+      if (thread) openThread(); else show("v-compose");
+    } catch {
+      show("v-missing");
+    }
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
