@@ -104,18 +104,24 @@ class _AlertThreadScreenState extends State<AlertThreadScreen> {
   Future<void> _sendReply(String text, AppLang theirs) async {
     final body = text.trim();
     if (body.isEmpty || _sending) return;
-    if (theirs == L10n.lang.value) return _send(body);
+    if (theirs == L10n.lang.value) {
+      await _send(body);
+      return;
+    }
     setState(() => _sending = true);
     String? translated;
+    var sameLanguage = false;
     try {
       final r = await translateReply(body, assumed: L10n.lang.value, to: theirs);
       translated = r.same ? null : r.text;
-      if (r.same) {
-        setState(() => _sending = false);
-        return _send(body);
-      }
+      sameLanguage = r.same;
     } catch (e) {
       debugPrint('reply translation failed: $e');
+    }
+    if (sameLanguage) {
+      if (mounted) setState(() => _sending = false);
+      await _send(body);
+      return;
     }
     if (!mounted) return;
     setState(() => _sending = false);
