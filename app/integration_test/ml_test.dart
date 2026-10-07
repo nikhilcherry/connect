@@ -33,6 +33,15 @@ void main() {
 
   carPhoto();
 
+  testWidgets('owner reply is translated into the stranger\'s language on the device', (t) async {
+    final r = await translateReply('I am coming in five minutes, please wait', assumed: AppLang.en, to: AppLang.kn);
+    // ignore: avoid_print
+    print('REPLY_KN ${r.text}');
+    expect(r.same, isFalse);
+    expect(r.text, isNot(contains('coming')));
+    expect(RegExp(r'[\u0C80-\u0CFF]').hasMatch(r.text), isTrue, reason: 'should contain Kannada script');
+  });
+
   testWidgets('language id + translation run on the device', (t) async {
     final r = await translateTo('आपकी गाड़ी रास्ता रोक रही है', AppLang.en);
     // ignore: avoid_print

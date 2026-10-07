@@ -99,6 +99,54 @@ class _AlertThreadScreenState extends State<AlertThreadScreen> {
     }
   }
 
+  /// A typed or spoken reply. When the stranger reads another language, it is
+  /// translated on the phone and previewed before anything is sent.
+  Future<void> _sendReply(String text, AppLang theirs) async {
+    final body = text.trim();
+    if (body.isEmpty || _sending) return;
+    if (theirs == L10n.lang.value) return _send(body);
+    setState(() => _sending = true);
+    String? translated;
+    try {
+      final r = await translateReply(body, assumed: L10n.lang.value, to: theirs);
+      translated = r.same ? null : r.text;
+      if (r.same) {
+        setState(() => _sending = false);
+        return _send(body);
+      }
+    } catch (e) {
+      debugPrint('reply translation failed: $e');
+    }
+    if (!mounted) return;
+    setState(() => _sending = false);
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(translated == null ? tr('Couldn\'t translate') : tr('They will read ({language})', {'language': theirs.native})),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (translated != null) Text(translated, style: DLText.body.copyWith(fontWeight: FontWeight.w700, fontSize: 18)),
+          if (translated == null)
+            Text(tr('The language pack needs internet once. Send it as you wrote it?'), style: DLText.body)
+          else ...[
+            const SizedBox(height: 12),
+            Text(tr('You wrote'), style: DLText.small.copyWith(color: DL.muted)),
+            Text(body, style: DLText.body.copyWith(color: DL.muted)),
+          ],
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: Text(tr('Edit'))),
+          if (translated != null) TextButton(onPressed: () => Navigator.pop(c, 'original'), child: Text(tr('Send as written'))),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, translated == null ? 'original' : 'translated'),
+            child: Text(translated == null ? tr('Send as written') : tr('Send translation')),
+          ),
+        ],
+      ),
+    );
+    if (choice == 'translated') await _send(translated!);
+    if (choice == 'original') await _send(body);
+  }
+
   Future<void> _send(String text, {bool onMyWay = false}) async {
     final body = text.trim();
     if (body.isEmpty || _sending) return;
@@ -264,7 +312,7 @@ class _AlertThreadScreenState extends State<AlertThreadScreen> {
                             maxLength: 280,
                             textCapitalization: TextCapitalization.sentences,
                             decoration: InputDecoration(hintText: tr('Reply…'), counterText: ''),
-                            onSubmitted: _send,
+                            onSubmitted: (t) => _sendReply(t, alert.scannerLang),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -283,7 +331,7 @@ class _AlertThreadScreenState extends State<AlertThreadScreen> {
                             minimumSize: const Size(50, 50),
                             shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(DL.rButton))),
                           ),
-                          onPressed: _sending ? null : () => _send(_input.text),
+                          onPressed: _sending ? null : () => _sendReply(_input.text, alert.scannerLang),
                           icon: const Icon(Icons.send_outlined),
                         ),
                       ]),

@@ -55,6 +55,31 @@ Future<Translated?> translateTo(String text, AppLang to) async {
   }
 }
 
+/// The owner's free-text reply, translated on the phone into the language the
+/// stranger chose. The source is detected (an owner with a Hindi app may still
+/// type English); when detection is unsure, [assumed] (the app's language) is
+/// used. Throws if a language pack can't be fetched, so the caller can offer
+/// to send the text as written.
+Future<Translated> translateReply(String text, {required AppLang assumed, required AppLang to}) async {
+  final id = LanguageIdentifier(confidenceThreshold: 0.4);
+  try {
+    final from = languageFromCode(await id.identifyLanguage(text)) ?? _target(assumed);
+    if (from == _target(to)) return Translated(text, from: to.code, same: true);
+    final manager = OnDeviceTranslatorModelManager();
+    for (final l in [from, _target(to)]) {
+      if (!await manager.isModelDownloaded(l.bcpCode)) await manager.downloadModel(l.bcpCode);
+    }
+    final translator = OnDeviceTranslator(sourceLanguage: from, targetLanguage: _target(to));
+    try {
+      return Translated(await translator.translateText(text), from: from.bcpCode);
+    } finally {
+      await translator.close();
+    }
+  } finally {
+    await id.close();
+  }
+}
+
 /// Dictation in the app's language, so the owner can reply by voice. Returns
 /// the recogniser or null when the phone has none.
 class Dictation {
