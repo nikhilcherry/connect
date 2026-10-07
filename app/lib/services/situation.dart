@@ -13,22 +13,21 @@ class Situation {
   final Urgency urgency;
 }
 
-// Substrings of ML Kit's image-label names, strongest signal first. The base
-// model has no "dented" or "blocked" class, so this reads the scene: what is
-// in the frame says what the problem most likely is.
+// Substrings of ML Kit's image-label names. The base model has no "dented" or
+// "blocked" class and labels every car photo with Vehicle, Car, Wheel, Road,
+// Bumper, Windshield and so on, so those generic parts and surfaces are NOT
+// evidence of anything (a real parked car came back with all of them and
+// would have been called "blocking"). Only distinctive scene signs count;
+// otherwise there is no suggestion and the person picks the reason.
 const _rules = <(String kind, List<String> hints)>[
-  ('accident', ['crash', 'collision', 'bumper', 'dent', 'broken', 'wreck', 'smash', 'shatter', 'debris']),
-  ('towing', ['tow', 'crane', 'recovery', 'flatbed']),
-  ('lights_on', ['headlamp', 'headlight', 'automotive lighting', 'taillight', 'light']),
-  ('window_open', ['window', 'windshield', 'vehicle door', 'door', 'sunroof']),
-  ('blocking', ['gate', 'driveway', 'parking', 'garage', 'road', 'asphalt', 'street', 'fence', 'wall']),
+  ('accident', ['crash', 'collision', 'wreck', 'smash', 'shatter', 'debris', 'smoke']),
+  ('towing', ['tow truck', 'recovery vehicle', 'flatbed']),
+  ('blocking', ['gate', 'driveway', 'garage door']),
 ];
 
 const _drafts = {
   'accident': /*t*/'There seems to be damage to your car. Please come when you can.',
   'towing': /*t*/'Your car looks like it\'s about to be towed. Please come right away.',
-  'lights_on': /*t*/'Your car\'s lights are on.',
-  'window_open': /*t*/'A window or door on your car looks open.',
   'blocking': /*t*/'Your car is blocking the way. Could you move it?',
   'other': '',
 };
