@@ -139,7 +139,8 @@ supabase db push
 supabase functions deploy scan notify --no-verify-jwt
 # host web/ on Vercel (rewrites in web/vercel.json)
 
-cd app && flutter build apk --release --split-per-abi \   # arm64 is ~68 MB; the fat APK is ~180 MB because of ML Kit
+# --split-per-abi: arm64 is ~68 MB; one fat APK is ~180 MB because of ML Kit
+cd app && flutter build apk --release --split-per-abi \
   --dart-define=SUPABASE_URL=https://<your-project-ref>.supabase.co \
   --dart-define=SUPABASE_ANON_KEY=<publishable key> \
   --dart-define=SCAN_BASE_URL=https://<your-domain>
