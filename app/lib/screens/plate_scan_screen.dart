@@ -150,7 +150,7 @@ class _PlateScanScreenState extends State<PlateScanScreen> {
             textCapitalization: TextCapitalization.characters,
             maxLength: 13,
             onChanged: (_) => setState(() => _error = null),
-            decoration: InputDecoration(hintText: tr('e.g. KA01AB1234'), errorText: _error),
+            decoration: InputDecoration(hintText: tr('e.g. KA01AB1234'), errorText: _error, errorMaxLines: 3),
           ),
           if (_candidates.length > 1) ...[
             Wrap(spacing: 8, runSpacing: 8, children: [
