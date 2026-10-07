@@ -84,7 +84,7 @@ void main() {
   final models = dir.listSync().whereType<File>().where((f) => f.path.endsWith('.onnx')).toList();
 
   test('the app ships its three models', () {
-    expect(models.map((f) => f.uri.pathSegments.last).toSet(), {'plate_detector.onnx', 'plate_reader.onnx', 'damage_n.onnx'});
+    expect(models.map((f) => f.uri.pathSegments.last).toSet(), {'plate_detector.onnx', 'plate_reader.onnx', 'damage_detector.onnx'});
   });
 
   for (final f in models) {

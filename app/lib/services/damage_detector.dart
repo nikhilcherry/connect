@@ -6,10 +6,10 @@ import 'package:onnxruntime/onnxruntime.dart';
 import 'damage_cost.dart';
 import 'plate_detector.dart';
 
-/// The on-device car-damage detector: a YOLO11n we trained on ~10 000 labelled photos
+/// The on-device car-damage detector: a YOLO11s we trained on ~10 000 labelled photos, INT8
 /// (ml/README.md). Six classes, but only four are trustworthy: the training data has
 /// 56 broken-lamp and 4 flat-tyre examples, so those two are reported as "low confidence".
-const damageModelAsset = 'assets/models/damage_n.onnx';
+const damageModelAsset = 'assets/models/damage_detector.onnx';
 const damageModelSize = 512;
 const damageClasses = 6;
 const reliableDamage = {DamageType.scratch, DamageType.dent, DamageType.crack, DamageType.glassShatter};

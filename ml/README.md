@@ -7,7 +7,7 @@ cost estimator. Everything below was measured; where a number is weak it says so
 | --- | --- | --- | --- |
 | **Plate detector** | finds plates in a photo or live frame | 4.3 MB (INT8) | mAP50 **0.732** on real Indian phone photos (0.643 before fine-tuning) |
 | **Plate reader** | reads the characters of a cropped plate | 3.4 MB | **60.7%** exact on 150 held-out real Indian plates (ML Kit + our parser: 49.3%) |
-| **Damage detector** | finds dents, scratches, cracks, shattered glass | 10.5 MB | mAP50 **0.365**, honest and modest (see below) |
+| **Damage detector** | finds dents, scratches, cracks, shattered glass | 12.5 MB (INT8) | mAP50 **0.40**, honest and modest (see below) |
 | **Cost estimator** | rough repair cost range from the findings | n/a (hand-set table) | not learned, not a quote |
 
 ## 1. Plate detector (YOLO11n, 2.6 M parameters)
@@ -105,27 +105,31 @@ same 44 photos (among a few simple variants, all listed above and in the test hi
 57% as optimistic by a few points. Cost: about 1.3 s a photo on an x86 emulator (ML Kit runs
 twice), a proxy for a phone.
 
-## 3. Damage detector (YOLO11n, 6 classes, 512 px)
+## 3. Damage detector (YOLO11s, 6 classes, 512 px)
 
 Trained on [`tugberkkalay/autodamageiq-vehicle-damage-dataset`](https://huggingface.co/datasets/tugberkkalay/autodamageiq-vehicle-damage-dataset)
 (10,000 train / 2,094 val photos). The page says CC BY 4.0 but it is assembled from CarDD
 (research / non-commercial) and VehiDE with GPT-4o-assisted labels, so treat this model as
 **research-grade**.
 
-| Class | mAP50 (val) | Training labels |
-| --- | --- | --- |
-| shattered glass | **0.662** | 1,282 |
-| crack | 0.318 | 1,488 |
-| dent | 0.266 | 5,413 |
-| scratch | 0.212 | 13,413 |
-| broken lamp | not scored (none in val) | **56** |
-| flat tyre | not scored (none in val) | **4** |
-| **all (4 scored classes)** | **0.365** (float) / 0.352 (INT8) | |
+We first trained a YOLO11n (mAP50 0.37) and then a YOLO11s because the task is hard for a
+nano model; the larger one was adopted because it is clearly better on the same validation set.
 
-This is a hard task for a nano model: dents and scratches are small and subtle. **Only four
-classes are reliable**; lamp and tyre had too few examples, and the app says so. The model
-on-device reproduces the Python result (scratch 0.72 / crack 0.42 vs 0.72 / 0.45 on a
-held-out photo).
+| Class | YOLO11s mAP50 | (YOLO11n) | Training labels |
+| --- | --- | --- | --- |
+| shattered glass | **0.685** | 0.662 | 1,282 |
+| crack | 0.396 | 0.318 | 1,488 |
+| dent | 0.314 | 0.266 | 5,413 |
+| scratch | 0.251 | 0.212 | 13,413 |
+| broken lamp | not scored (none in val) | | **56** |
+| flat tyre | not scored (none in val) | | **4** |
+| **all (4 scored classes)** | **0.411** (float 0.418, INT8 **0.396** as shipped) | 0.365 | |
+
+Shipped as INT8 with the head in float: 12.5 MB, 0.396 mAP50 (float 37.9 MB, 0.418).
+
+Still modest: dents and scratches are small and subtle. **Only four classes are reliable**; lamp
+and tyre had too few examples, and the app says so. The model on-device reproduces the Python
+result (scratch 0.64 / crack 0.50 on a held-out photo, 268 ms on the emulator).
 
 ## 4. Cost estimator (`app/lib/services/damage_cost.dart`)
 
