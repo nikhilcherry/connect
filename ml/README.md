@@ -73,10 +73,11 @@ ML Kit was measured **before** training, on the same crops, upscaled the way the
 | ML Kit, raw text | 46 (30.7%) | |
 | ML Kit + our plate-pattern repair | 74 (49.3%) | 41.3-57.3% |
 | **Our reader** | **91 (60.7%)** | 52.7-68.0% |
-| **Ours if it is a valid plate, else ML Kit** (what the app does) | **98 (65.3%)** | |
+| **Ours if it is a valid plate, else ML Kit** (first guess in the app) | **98 (65.3%)** | |
+| The correct plate is among the one or two candidates the app shows as chips | **109 (72.7%)** | |
 
 Paired: ours right where ML Kit was wrong 35 times, the reverse 18 times (sign test
-p = 0.027). ML Kit is slightly more precise when it answers (76% vs 71%) but answers on
+p = 0.027). When both give a valid plate and disagree (30 plates), ours is right 15 times, ML Kit 11, neither 4, which is why ours is tried first. ML Kit is slightly more precise when it answers (76% vs 71%) but answers on
 only 97 of 150. The Dart/ONNX version run on the Android emulator scores the same 91/150
 at 18 ms per plate.
 

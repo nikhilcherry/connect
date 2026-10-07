@@ -47,6 +47,8 @@ class _PlateScanScreenState extends State<PlateScanScreen> {
     setState(() {
       _phase = _Phase.reading;
       _error = null;
+      _code = null; // the result below belongs to the previous plate
+      _situation = null;
     });
     try {
       final plates = (await readPlatesInPhoto(File(shot.path))).plates;
@@ -74,6 +76,8 @@ class _PlateScanScreenState extends State<PlateScanScreen> {
     setState(() {
       _plate.text = plate;
       _error = null;
+      _code = null;
+      _situation = null;
     });
     await _find();
   }
@@ -167,13 +171,27 @@ class _PlateScanScreenState extends State<PlateScanScreen> {
             controller: _plate,
             textCapitalization: TextCapitalization.characters,
             maxLength: 13,
-            onChanged: (_) => setState(() => _error = null),
+            onChanged: (_) => setState(() {
+              // a different plate than the one that was looked up: drop its result
+              _error = null;
+              _code = null;
+              _situation = null;
+              if (_phase == _Phase.notFound) _phase = _Phase.ready;
+            }),
             decoration: InputDecoration(hintText: tr('e.g. KA01AB1234'), errorText: _error, errorMaxLines: 3),
           ),
           if (_candidates.length > 1) ...[
             Wrap(spacing: 8, runSpacing: 8, children: [
               for (final c in _candidates.take(4))
-                ActionChip(label: Text(c), onPressed: () => setState(() => _plate.text = c)),
+                ActionChip(
+                  label: Text(c),
+                  onPressed: () => setState(() {
+                    _plate.text = c;
+                    _code = null;
+                    _situation = null;
+                    if (_phase == _Phase.notFound) _phase = _Phase.ready;
+                  }),
+                ),
             ]),
             const SizedBox(height: 16),
           ],
