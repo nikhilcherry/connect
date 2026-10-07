@@ -45,6 +45,12 @@ flutter {
     source = "../.."
 }
 
+// The ML Kit image-labelling plugin drags in the legacy firebase-iid, whose
+// classes firebase-messaging already contains.
+configurations.all {
+    exclude(group = "com.google.firebase", module = "firebase-iid")
+}
+
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
