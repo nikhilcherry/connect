@@ -1,22 +1,25 @@
+// ignore_for_file: unnecessary_import
 import 'dart:io';
 
 import 'package:connect/l10n.dart';
 import 'package:connect/services/bridge.dart';
+import 'package:connect/services/plate_detector.dart';
 import 'package:connect/services/plate_reader.dart';
 import 'package:connect/services/situation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:path_provider/path_provider.dart';
 
+// adb push integration_test/assets/*.{png,jpg} /data/local/tmp/
+Future<File> asset(String name) async {
+  final f = File('${(await getTemporaryDirectory()).path}/$name');
+  return File('/data/local/tmp/$name').copy(f.path);
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-
-  // adb push integration_test/assets/plate.png /data/local/tmp/plate.png
-  Future<File> asset(String name) async {
-    final f = File('${(await getTemporaryDirectory()).path}/$name');
-    return File('/data/local/tmp/$name').copy(f.path);
-  }
 
   testWidgets('OCR reads a plate photo on the device', (t) async {
     final plates = await readPlates(await asset('plate.png'));
@@ -32,6 +35,37 @@ void main() {
   });
 
   carPhoto();
+  realWorldPlates();
+
+  // Our own YOLO11n plate detector, run on the device with ONNX Runtime.
+  // adb push integration_test/assets/car_with_plate.jpg /data/local/tmp/
+  // Ground truth (472x303 test photo): plate at x 233..331, y 106..193.
+  testWidgets('our plate detector finds the plate in a real photo', (t) async {
+    final f = await asset('car_with_plate.jpg');
+    final px = await Pixels.fromFile(f);
+    final detector = await PlateDetector.load();
+    final sw = Stopwatch()..start();
+    final boxes = await detector.detect(px);
+    sw.stop();
+    final sw2 = Stopwatch()..start();
+    for (var i = 0; i < 5; i++) {
+      await detector.detect(px);
+    }
+    sw2.stop();
+    // ignore: avoid_print
+    print('DETECT ${px.width}x${px.height} first=${sw.elapsedMilliseconds}ms avg5=${sw2.elapsedMilliseconds ~/ 5}ms boxes=$boxes');
+    expect(boxes, isNotEmpty);
+    final s = px.width / 472;
+    final gt = PlateBox(233 * s, 106 * s, 331 * s, 193 * s, 1);
+    final b = boxes.first;
+    final l = [b.left, gt.left].reduce((a, c) => a > c ? a : c), tp = [b.top, gt.top].reduce((a, c) => a > c ? a : c);
+    final r = [b.right, gt.right].reduce((a, c) => a < c ? a : c), bt = [b.bottom, gt.bottom].reduce((a, c) => a < c ? a : c);
+    final inter = (r - l).clamp(0, 1e9) * (bt - tp).clamp(0, 1e9);
+    final iou = inter / (b.area + gt.area - inter);
+    // ignore: avoid_print
+    print('IOU ${iou.toStringAsFixed(3)}');
+    expect(iou, greaterThan(0.6));
+  });
 
   testWidgets('owner reply is translated into the stranger\'s language on the device', (t) async {
     final r = await translateReply('I am coming in five minutes, please wait', assumed: AppLang.en, to: AppLang.kn);
@@ -67,3 +101,24 @@ void carPhoto() {
     print('SUGGESTION ${s?.kind} ${s?.urgency}');
   });
 }
+
+
+/// Real photos: adb push /tmp/.../kolkata.jpg bangalore.jpg to /data/local/tmp/.
+void realWorldPlates() {
+  for (final name in ['kolkata.jpg', 'bangalore.jpg']) {
+    testWidgets('pipeline on $name', (t) async {
+      final src = File('/data/local/tmp/$name');
+      if (!src.existsSync()) return;
+      final f = await asset(name);
+      final sw = Stopwatch()..start();
+      final r = await readPlatesInPhoto(f);
+      // ignore: avoid_print
+      print('PIPELINE $name ${sw.elapsedMilliseconds}ms detector=${r.usedDetector} boxes=${r.boxes} plates=${r.plates}');
+      final whole = await readPlates(f);
+      // ignore: avoid_print
+      print('WHOLE    $name plates=$whole');
+    });
+  }
+}
+
+

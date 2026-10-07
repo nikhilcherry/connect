@@ -48,7 +48,7 @@ class _PlateScanScreenState extends State<PlateScanScreen> {
       _error = null;
     });
     try {
-      final plates = await readPlates(File(shot.path));
+      final plates = (await readPlatesInPhoto(File(shot.path))).plates;
       if (!mounted) return;
       setState(() {
         _candidates = plates;

@@ -9,7 +9,7 @@ A QR tag on the windshield turns "whose car is this?" into a private two-way cha
 | **Platform** | Android (Flutter) + static web scan page + Supabase backend |
 | **Running cost** | ₹0 / month on free tiers |
 | **Languages** | English, हिन्दी, ಕನ್ನಡ, தமிழ் (app, scan page and trip page) |
-| **Tests** | 130 backend end-to-end checks · 53 app tests · 4 on-device ML checks |
+| **Tests** | 130 backend end-to-end checks · 59 app tests · 4 on-device ML checks |
 
 
 <p align="center">
@@ -90,7 +90,7 @@ owner's app ◄─────────────────────�
 
 Built for phone-first use, with audio and images processed on the device:
 
-1. **The plate is the QR. (Built.)** Garage → *Reach a car by its plate*: on-device OCR (ML Kit) reads a number plate, and if the owner is on Connect it opens the masked chat, so no sticker is needed. The photo never leaves the phone; the `plate` action only returns a tag code (and nothing when a plate is claimed by more than one account, so a squatter never receives your messages), shares the wrong-guess rate limit with plate checks, and is covered by the e2e suite.
+1. **The plate is the QR. (Built.)** Garage → *Reach a car by its plate*: our own plate detector (a YOLO11n we trained, 10 MB, on-device; see `ml/`) finds the plate and the on-device text reader (ML Kit) reads the crop, and if the owner is on Connect it opens the masked chat, so no sticker is needed. The photo never leaves the phone; the `plate` action only returns a tag code (and nothing when a plate is claimed by more than one account, so a squatter never receives your messages), shares the wrong-guess rate limit with plate checks, and is covered by the e2e suite.
 2. **Situation understanding. (Built, deliberately conservative.)** After finding a car by plate, a photo of the problem is labelled on-device (ML Kit). ML Kit's base model labels every car photo "Vehicle, Car, Wheel, Road, Bumper…", so generic parts prove nothing; a suggestion (reason, drafted message, urgency flag) appears only on distinctive signs such as a wreck, a tow truck or a gate in frame, and otherwise the person picks the reason. Measured on a real car photo on an emulator: no suggestion. The suggestion rides to the scan page in the URL fragment (never sent to a server) and the sender still reviews and sends it.
 3. **Language bridge. (Built.)** In an alert thread, a stranger's message has a *Translate* action: the language is detected and translated into the app's language by ML Kit models on the phone (a ~30 MB pack per language downloads once). The owner can also dictate a reply with the phone's speech recogniser. Going the other way, the scan page sends the stranger's chosen language with the alert, and the owner's quick replies are sent in that language from the app's own translation tables (no machine translation), so a Kannada speaker gets "2 ನಿಮಿಷದಲ್ಲಿ ಬರುತ್ತೇನೆ" even when the owner's app is in English. Free-text replies, typed or spoken, are translated into the stranger's language on the phone too, with a preview ("They will read: …" next to what you wrote) before anything is sent; verified on an Android 15 emulator. Voice notes from the *stranger* are not handled, since the scan page has no on-device model.
 

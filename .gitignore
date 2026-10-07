@@ -5,3 +5,12 @@ supabase/.temp
 web/config.local.js
 web/.vercel
 brag-output/snapshots/
+
+# x86_64 ONNX Runtime for emulator testing only (see ml/README.md)
+app/android/app/src/main/jniLibs/x86_64/
+
+# ml/: keep scripts, results and the small checkpoint; drop the training runs
+ml/runs/
+
+ml/*.pt
+!ml/weights/*.pt

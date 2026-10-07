@@ -1,6 +1,10 @@
 import 'dart:io';
 
+import 'package:path_provider/path_provider.dart';
+
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+
+import 'plate_detector.dart';
 
 /// Pulls Indian number plates out of OCR text. Pure so it can be tested
 /// without a camera: the recogniser hands over messy lines, this keeps the
@@ -96,4 +100,47 @@ Future<List<String>> readPlates(File photo) async {
   } finally {
     await recogniser.close();
   }
+}
+
+
+/// What the pipeline found in a photo, best candidate first.
+class PlateReading {
+  const PlateReading(this.plates, this.boxes, {required this.usedDetector});
+  final List<String> plates;
+  final List<PlateBox> boxes;
+
+  /// False when the detector found nothing and the whole photo was read instead.
+  final bool usedDetector;
+}
+
+/// Our own detector finds the plate first, then the text reader reads only the
+/// crop. That is far more reliable on a busy street than reading the whole
+/// frame, and it works with several cars in view. Falls back to reading the
+/// whole photo when the detector finds nothing (or can't run).
+Future<PlateReading> readPlatesInPhoto(File photo) async {
+  List<PlateBox> boxes = const [];
+  final plates = <String>[];
+  try {
+    final px = await Pixels.fromFile(photo);
+    boxes = await (await PlateDetector.load()).detect(px);
+    final dir = await getTemporaryDirectory();
+    final recogniser = TextRecognizer(script: TextRecognitionScript.latin);
+    try {
+      for (var i = 0; i < boxes.length && i < 4; i++) {
+        final crop = File('${dir.path}/plate_crop_$i.png');
+        await crop.writeAsBytes(await px.cropPng(boxes[i]));
+        final text = (await recogniser.processImage(InputImage.fromFile(crop))).text;
+        for (final p in extractPlates(text)) {
+          if (!plates.contains(p)) plates.add(p);
+        }
+      }
+    } finally {
+      await recogniser.close();
+    }
+  } catch (e) {
+    // No native library for this CPU, a bad file: fall through to the whole photo.
+    boxes = const [];
+  }
+  if (plates.isNotEmpty) return PlateReading(plates, boxes, usedDetector: true);
+  return PlateReading(await readPlates(photo), boxes, usedDetector: false);
 }
