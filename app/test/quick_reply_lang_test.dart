@@ -27,4 +27,13 @@ void main() {
     expect(CarAlert.fromJson(row(null)).scannerLang, AppLang.en);
     expect(CarAlert.fromJson(row('zz')).scannerLang, AppLang.en);
   });
+
+  test('an alert knows when the owner first saw it', () {
+    Map<String, dynamic> row(String? seen) => {
+          'id': 'a', 'vehicle_id': 'v', 'kind': 'other', 'status': 'open', 'blocked': false,
+          'created_at': '2026-10-07T10:00:00Z', 'updated_at': '2026-10-07T10:00:00Z', 'seen_at': seen,
+        };
+    expect(CarAlert.fromJson(row(null)).seenAt, isNull);
+    expect(CarAlert.fromJson(row('2026-10-07T10:01:00Z')).seenAt, isNotNull);
+  });
 }

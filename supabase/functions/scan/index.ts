@@ -7,7 +7,7 @@
 //   lookup  { code }                              -> vehicle make/model/colour only
 //   plate   { plate }                             -> { code } if a Connect car has that plate (plate-as-QR, OCR runs on-device)
 //   alert   { code, plate_last4, kind, note?, photo?, lang? } -> { alert_id, token }
-//   thread  { alert_id, token }                   -> { status, kind, note, messages, owner_status, medical }
+//   thread  { alert_id, token }                   -> { status, seen, kind, note, messages, owner_status, medical }
 //   reply   { alert_id, token, body }             -> { ok }
 //   trip    { token }                             -> live position of a shared trip (web/trip.html)
 
@@ -296,13 +296,14 @@ Deno.serve(async (req) => {
       if (!id) return json({ status: "open", messages: [] });
       const [{ data: alert }, { data: messages }] = await Promise.all([
         db.from("alerts")
-          .select("status, blocked, kind, note, vehicle:vehicles(back_at, away_note, medical_share, blood_group, medical_note)")
+          .select("status, blocked, kind, note, seen_at, vehicle:vehicles(back_at, away_note, medical_share, blood_group, medical_note)")
           .eq("id", id).single(),
         db.from("alert_messages").select("id, sender, body, created_at").eq("alert_id", id).order("id", { ascending: true }),
       ]);
       if (!alert || alert.blocked) return json({ status: "open", messages: [] });
       return json({
         status: alert.status,
+        seen: alert.seen_at != null,
         kind: alert.kind,
         note: alert.note,
         messages,

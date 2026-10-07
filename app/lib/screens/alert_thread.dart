@@ -46,6 +46,7 @@ class _AlertThreadScreenState extends State<AlertThreadScreen> {
     final s = AppScope.read(context);
     _load();
     _channel = s.watchMessages(widget.alertId, _load);
+    s.markSeen(widget.alertId);
   }
 
   @override

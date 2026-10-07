@@ -233,6 +233,7 @@
       sending: "Sending…",
       status_open: "Owner notified", status_on_my_way: "Owner is on the way", status_resolved: "Marked as sorted",
       sub_open: "Keep this page open. Replies appear here.",
+      sub_open_seen: "The owner has seen your message. Replies appear here.",
       sub_on_my_way: "They've seen your message.",
       sub_resolved: "Thanks for helping out.",
       replyPh: "Reply to the owner…",
@@ -268,6 +269,7 @@
       sending: "भेजा जा रहा है…",
       status_open: "मालिक को सूचना भेज दी गई", status_on_my_way: "मालिक आ रहे हैं", status_resolved: "समस्या सुलझ गई",
       sub_open: "यह पेज खुला रखें। जवाब यहीं दिखेंगे।",
+      sub_open_seen: "मालिक ने आपका संदेश देख लिया है। जवाब यहीं दिखेंगे।",
       sub_on_my_way: "उन्होंने आपका संदेश देख लिया है।",
       sub_resolved: "मदद करने के लिए धन्यवाद।",
       replyPh: "मालिक को जवाब दें…",
@@ -303,6 +305,7 @@
       sending: "ಕಳುಹಿಸುತ್ತಿದೆ…",
       status_open: "ಮಾಲೀಕರಿಗೆ ತಿಳಿಸಲಾಗಿದೆ", status_on_my_way: "ಮಾಲೀಕರು ಬರುತ್ತಿದ್ದಾರೆ", status_resolved: "ಸರಿಯಾಗಿದೆ ಎಂದು ಗುರುತಿಸಲಾಗಿದೆ",
       sub_open: "ಈ ಪುಟ ತೆರೆದಿಡಿ. ಉತ್ತರಗಳು ಇಲ್ಲಿ ಕಾಣುತ್ತವೆ.",
+      sub_open_seen: "ಮಾಲೀಕರು ನಿಮ್ಮ ಸಂದೇಶ ನೋಡಿದ್ದಾರೆ. ಉತ್ತರಗಳು ಇಲ್ಲಿ ಕಾಣುತ್ತವೆ.",
       sub_on_my_way: "ಅವರು ನಿಮ್ಮ ಸಂದೇಶ ನೋಡಿದ್ದಾರೆ.",
       sub_resolved: "ಸಹಾಯ ಮಾಡಿದ್ದಕ್ಕೆ ಧನ್ಯವಾದ.",
       replyPh: "ಮಾಲೀಕರಿಗೆ ಉತ್ತರಿಸಿ…",
@@ -338,6 +341,7 @@
       sending: "அனுப்புகிறது…",
       status_open: "உரிமையாளருக்குத் தெரிவிக்கப்பட்டது", status_on_my_way: "உரிமையாளர் வருகிறார்", status_resolved: "சரியானது எனக் குறிக்கப்பட்டது",
       sub_open: "இந்தப் பக்கத்தைத் திறந்து வையுங்கள். பதில்கள் இங்கே தோன்றும்.",
+      sub_open_seen: "உரிமையாளர் உங்கள் செய்தியைப் பார்த்துவிட்டார். பதில்கள் இங்கே தோன்றும்.",
       sub_on_my_way: "அவர்கள் உங்கள் செய்தியைப் பார்த்துவிட்டார்கள்.",
       sub_resolved: "உதவியதற்கு நன்றி.",
       replyPh: "உரிமையாளருக்குப் பதிலளி…",
@@ -379,7 +383,7 @@
   const saved = store.get("dlc-lang");
   const browser = (navigator.language || "en").slice(0, 2);
   let lang = LANGS.includes(saved) ? saved : LANGS.includes(browser) ? browser : "en";
-  let code = null, kind = null, thread = null, pollTimer = null, lastStatus = null, lastBackBy = null, lastMedical = null, photo = null;
+  let code = null, kind = null, thread = null, pollTimer = null, lastStatus = null, lastSeen = false, lastBackBy = null, lastMedical = null, photo = null;
   const t = (k) => STR[lang][k] ?? STR.en[k] ?? k;
   const errText = (c) => (STR.en[`err_${c}`] ? t(`err_${c}`) : t("err_generic"));
 
@@ -464,9 +468,10 @@
     }
   }
 
-  function renderStatus(status) {
-    const changed = lastStatus !== status;
+  function renderStatus(status, seen = lastSeen) {
+    const changed = lastStatus !== status || lastSeen !== seen;
     lastStatus = status;
+    lastSeen = seen;
     $("dot").className = `dot ${status}`;
     $("dot").classList.toggle("hidden", status === "resolved");
     $("check").classList.toggle("hidden", status !== "resolved");
@@ -479,7 +484,7 @@
       }
     }
     $("status-text").textContent = t(`status_${status}`);
-    $("status-sub").textContent = t(`sub_${status}`);
+    $("status-sub").textContent = t(status === "open" && seen ? "sub_open_seen" : `sub_${status}`);
     $("reply-box").classList.toggle("hidden", status === "resolved");
   }
 
@@ -556,7 +561,7 @@
   async function poll() {
     try {
       const r = await call({ action: "thread", ...thread });
-      renderStatus(r.status);
+      renderStatus(r.status, !!r.seen);
       renderBackBy(r.owner_status);
       renderMedical(r.medical);
       renderMessages(r);

@@ -389,6 +389,25 @@ check(dead.status === 404, "deactivated tag stops working", dead);
   check(byId[bogus.data.alert_id] === "en" && byId[none.data.alert_id] === "en", "unknown or missing language falls back to English", rows);
 }
 
+// --- "the owner has seen your message"
+{
+  const o = await signIn();
+  const other = await signIn();
+  const sp = `KA08SS${Math.floor(1000 + Math.random() * 8999)}`;
+  const sv = await rest(o, "POST", "vehicles", { reg_number: sp, make: "Maruti Suzuki", model: "Baleno" });
+  const st = await rest(o, "POST", "tags", { vehicle_id: sv.data[0].id });
+  const a = await scan({ action: "alert", code: st.data[0].code, kind: "blocking", plate_last4: sp.slice(-4) }, "10.9.3.1");
+  const before = await scan({ action: "thread", alert_id: a.data.alert_id, token: a.data.token }, "10.9.3.2");
+  check(before.data.seen === false, "a fresh alert is not marked seen", before);
+  const stolen = await rest(other, "PATCH", `alerts?id=eq.${a.data.alert_id}`, { seen_at: new Date().toISOString() });
+  const still = await scan({ action: "thread", alert_id: a.data.alert_id, token: a.data.token }, "10.9.3.3");
+  check(still.data.seen === false, "another user cannot mark someone else's alert seen", [stolen, still]);
+  const mark = await rest(o, "PATCH", `alerts?id=eq.${a.data.alert_id}`, { seen_at: new Date().toISOString() });
+  check(mark.status < 300, "owner marks the alert seen", mark);
+  const after = await scan({ action: "thread", alert_id: a.data.alert_id, token: a.data.token }, "10.9.3.4");
+  check(after.data.seen === true, "the person at the car is told it was seen", after);
+}
+
 // --- more than one car per account
 {
   const multi = await signIn();

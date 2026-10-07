@@ -494,6 +494,20 @@ class AppState extends ChangeNotifier {
     await _db.from('alert_messages').insert({'alert_id': alertId, 'sender': 'owner', 'body': body});
   }
 
+  /// Opening an alert tells the person at the car that someone has seen it.
+  /// Only the first open counts; failures are ignored (it is a courtesy).
+  Future<void> markSeen(String alertId) async {
+    final a = alerts.where((x) => x.id == alertId).firstOrNull;
+    if (a == null || a.seenAt != null) return;
+    try {
+      await _db.from('alerts').update({'seen_at': DateTime.now().toUtc().toIso8601String()}).eq('id', alertId).filter('seen_at', 'is', null);
+      await _loadAlerts();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('markSeen failed: $e');
+    }
+  }
+
   Future<void> setStatus(String alertId, AlertStatus status) async {
     await _db.from('alerts').update({'status': status.wire}).eq('id', alertId);
     await _loadAlerts();
