@@ -641,6 +641,23 @@
     return (q || (path && path[1]) || "").toUpperCase();
   }
 
+  // The Connect app can hand over what it worked out on the phone (reason,
+  // plate, a drafted note) in the URL fragment, which is never sent to a
+  // server. The sender still sees and sends everything themselves.
+  function prefill() {
+    const h = new URLSearchParams(location.hash.slice(1));
+    const k = h.get("k");
+    if (REASONS.includes(k)) kind = k;
+    const p = (h.get("p") || "").replace(/[^a-z0-9]/gi, "").slice(-4);
+    if (p.length === 4) $("plate").value = p.toUpperCase();
+    const n = h.get("n");
+    if (n) $("note").value = n.slice(0, 280);
+    renderReasons();
+    $("sos").classList.toggle("hidden", kind !== "accident");
+    validate();
+    if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+  }
+
   async function init() {
     applyLang();
     $("lang").onchange = (e) => { lang = e.target.value; store.set("dlc-lang", lang); applyLang(); };
@@ -664,7 +681,7 @@
     try {
       const car = await call({ action: "lookup", code });
       $("car-name").textContent = [car.colour, car.make, car.model].filter(Boolean).join(" ");
-      if (thread) openThread(); else show("v-compose");
+      if (thread) openThread(); else { prefill(); show("v-compose"); }
     } catch {
       show("v-missing");
     }

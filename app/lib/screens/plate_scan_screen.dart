@@ -8,6 +8,7 @@ import '../config.dart';
 import '../l10n.dart';
 import '../main.dart';
 import '../services/plate_reader.dart';
+import '../services/situation.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/motion.dart';
@@ -29,6 +30,9 @@ class _PlateScanScreenState extends State<PlateScanScreen> {
   _Phase _phase = _Phase.idle;
   List<String> _candidates = const [];
   String? _error;
+  String? _code; // tag code once the car is found
+  Situation? _situation;
+  bool _analysing = false;
 
   @override
   void dispose() {
@@ -79,14 +83,45 @@ class _PlateScanScreenState extends State<PlateScanScreen> {
         setState(() => _phase = _Phase.notFound);
         return;
       }
-      setState(() => _phase = _Phase.ready);
-      await launchUrl(Uri.parse(Config.tagUrl(code)), mode: LaunchMode.externalApplication);
+      setState(() {
+        _phase = _Phase.ready;
+        _code = code;
+      });
     } catch (e) {
       if (mounted) {
         setState(() => _phase = _Phase.ready);
         showError(context, e);
       }
     }
+  }
+
+  Future<void> _photographProblem() async {
+    final shot = await ImagePicker().pickImage(source: ImageSource.camera, maxWidth: 1280, imageQuality: 80);
+    if (shot == null || !mounted) return;
+    setState(() => _analysing = true);
+    Situation? s;
+    try {
+      s = await readSituation(File(shot.path));
+    } catch (_) {}
+    if (mounted) {
+      setState(() {
+        _situation = s;
+        _analysing = false;
+      });
+    }
+  }
+
+  /// Opens the scan page with the plate and anything the phone suggested.
+  /// They ride in the URL fragment, which is never sent to a server.
+  Future<void> _openChat() async {
+    final plate = _plate.text.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    final q = <String, String>{
+      'p': plate.substring(plate.length - 4),
+      if (_situation != null) 'k': _situation!.kind,
+      if (_situation != null && _situation!.note.isNotEmpty) 'n': tr(_situation!.note),
+    };
+    final frag = q.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&');
+    await launchUrl(Uri.parse('${Config.tagUrl(_code!)}#$frag'), mode: LaunchMode.externalApplication);
   }
 
   @override
@@ -135,6 +170,33 @@ class _PlateScanScreenState extends State<PlateScanScreen> {
                 tr('That car isn\'t on Connect yet. Nothing was sent and nobody was told.'),
                 style: DLText.body,
               ),
+            ),
+          ],
+          if (_code != null) ...[
+            const SizedBox(height: 16),
+            SectionCard(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Label(tr('This car is on Connect')),
+                const SizedBox(height: 8),
+                Text(tr('Add a photo of the problem and your phone will suggest what to tell the owner.'), style: DLText.body),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _analysing ? null : _photographProblem,
+                  icon: const Icon(Icons.auto_awesome_outlined),
+                  label: Text(_analysing ? tr('Looking at the photo…') : tr('Photograph the problem')),
+                ),
+                if (_situation != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _situation!.urgency == Urgency.high ? tr('Looks urgent') : tr('Suggested message'),
+                    style: DLText.small.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(_situation!.note.isEmpty ? tr('Add a short note on the next page.') : tr(_situation!.note), style: DLText.body),
+                ],
+                const SizedBox(height: 12),
+                FilledButton(onPressed: _openChat, child: Text(tr('Message the owner'))),
+              ]),
             ),
           ],
           const SizedBox(height: 24),
