@@ -5,6 +5,7 @@
 //
 // POST JSON { action, ... }:
 //   lookup  { code }                              -> vehicle make/model/colour only
+//   plate   { plate }                             -> { code } if a Connect car has that plate (plate-as-QR, OCR runs on-device)
 //   alert   { code, plate_last4, kind, note?, photo? } -> { alert_id, token }
 //   thread  { alert_id, token }                   -> { status, kind, note, messages, owner_status, medical }
 //   reply   { alert_id, token, body }             -> { ok }
@@ -185,6 +186,28 @@ Deno.serve(async (req) => {
       if (!tag) return json({ error: "tag_not_found" }, 404);
       const v = tag.vehicle;
       return json({ code: tag.code, make: v.make, model: v.model, colour: v.colour });
+    }
+
+    // Plate-as-QR: the phone read a plate with on-device OCR. Answers only with
+    // the tag code of an active tag (the same thing a QR scan yields), so the
+    // reply reveals "a Connect car exists", never a name or number. Failed
+    // guesses count against the same per-IP budget as wrong plate digits, so
+    // it can't be used to enumerate plates.
+    case "plate": {
+      const plate = String(body.plate ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (!/^[A-Z0-9]{6,11}$/.test(plate)) return json({ error: "tag_not_found" }, 404);
+      const { count: fails } = await db.from("scan_failures").select("id", { count: "exact", head: true })
+        .eq("ip_hash", ipHash).gte("created_at", minutesAgo(10));
+      if ((fails ?? 0) >= LIMITS.plateFailsPerIp10m) return json({ error: "too_many_attempts" }, 429);
+      const { data: v } = await db.from("vehicles").select("id").eq("reg_number", plate).limit(1).maybeSingle();
+      const { data: t } = v
+        ? await db.from("tags").select("code").eq("vehicle_id", v.id).eq("active", true).limit(1).maybeSingle()
+        : { data: null };
+      if (!t) {
+        await db.from("scan_failures").insert({ ip_hash: ipHash, tag_code: null });
+        return json({ error: "tag_not_found" }, 404);
+      }
+      return json({ code: t.code });
     }
 
     case "alert": {

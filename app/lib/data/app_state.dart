@@ -314,6 +314,19 @@ class AppState extends ChangeNotifier {
     await _db.from('society_members').delete().eq('society_id', societyId).eq('member', member);
   }
 
+  /// Plate-as-QR: the tag code of the Connect car with this plate, or null.
+  /// The server only ever answers "a Connect car exists", never who owns it.
+  Future<String?> findTagByPlate(String plate) async {
+    try {
+      final res = await _db.functions.invoke('scan', body: {'action': 'plate', 'plate': plate});
+      final data = res.data;
+      return data is Map ? data['code'] as String? : null;
+    } on FunctionException catch (e) {
+      if (e.status == 404) return null;
+      rethrow;
+    }
+  }
+
   /// Posts to everyone in the society, then asks the server to push it.
   Future<void> postNotice(String societyId, String body) async {
     final row = await _db.from('society_notices').insert({'society_id': societyId, 'body': body.trim()}).select('id').single();

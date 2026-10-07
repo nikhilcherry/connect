@@ -9,7 +9,7 @@ A QR tag on the windshield turns "whose car is this?" into a private two-way cha
 | **Platform** | Android (Flutter) + static web scan page + Supabase backend |
 | **Running cost** | ₹0 / month on free tiers |
 | **Languages** | English, हिन्दी, ಕನ್ನಡ, தமிழ் (app, scan page and trip page) |
-| **Tests** | 109 backend end-to-end checks · 34 app tests |
+| **Tests** | 112 backend end-to-end checks · 41 app tests |
 
 ---
 
@@ -81,7 +81,7 @@ owner's app ◄─────────────────────�
 
 Built for phone-first use, with audio and images processed on the device:
 
-1. **The plate is the QR.** On-device OCR reads a number plate and opens the masked chat if the owner is on Connect, so no sticker is needed. A lookup only ever answers "a Connect user exists", never a name or number.
+1. **The plate is the QR. (Built.)** Garage → *Reach a car by its plate*: on-device OCR (ML Kit) reads a number plate, and if the owner is on Connect it opens the masked chat, so no sticker is needed. The photo never leaves the phone; the `plate` action only returns a tag code, shares the wrong-guess rate limit with plate checks, and is covered by the e2e suite.
 2. **Situation understanding.** A photo of the problem (blocked in, lights on, flat tyre, dent) is classified by an on-device vision model, which drafts a clear message with an urgency level.
 3. **Language bridge.** A voice note in Kannada, Hindi or Tamil is transcribed and translated on-device, so each side reads the other in their own language.
 

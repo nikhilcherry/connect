@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'plate_scan_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -90,6 +91,13 @@ class GarageTab extends StatelessWidget {
               title: tr('Renewals and reminders'),
               subtitle: tr('PUC, insurance and service dates'),
               onTap: () => push(context, const RenewalsScreen()),
+            ),
+            const Divider(),
+            _Row(
+              icon: Icons.document_scanner_outlined,
+              title: tr('Reach a car by its plate'),
+              subtitle: tr('Point the camera at any number plate; the reading happens on this phone'),
+              onTap: () => push(context, const PlateScanScreen()),
             ),
             const Divider(),
             _Row(

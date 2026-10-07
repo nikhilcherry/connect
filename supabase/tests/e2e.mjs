@@ -82,6 +82,14 @@ check(anonRead.status >= 400 || (await anonRead.json()).length === 0, "anon key 
 const look = await scan({ action: "lookup", code }, ip);
 check(look.status === 200 && look.data.model === "Swift" && !("reg_number" in look.data), "lookup shows car but not plate", look);
 
+const byPlate = await scan({ action: "plate", plate: plate.toLowerCase().replace(/(.{4})/, "$1 ") }, "10.9.0.1");
+check(byPlate.status === 200 && byPlate.data.code === code && Object.keys(byPlate.data).length === 1, "plate-as-QR returns only the tag code", byPlate);
+const noPlate = await scan({ action: "plate", plate: "KA01ZZ9999" }, "10.9.0.2");
+check(noPlate.status === 404 && noPlate.data.error === "tag_not_found", "unknown plate is 404", noPlate);
+let plateCapped = null;
+for (let i = 0; i < 6; i++) plateCapped = await scan({ action: "plate", plate: `KA01ZZ99${10 + i}` }, "10.9.0.3");
+check(plateCapped.status === 429, "plate guessing is rate-limited per sender", plateCapped);
+
 const bad = await scan({ action: "lookup", code: "ZZZZZZZZ" }, ip);
 check(bad.status === 404, "unknown tag is 404", bad);
 
