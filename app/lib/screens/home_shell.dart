@@ -26,7 +26,11 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    final open = AppScope.of(context).openAlerts;
+    final state = AppScope.of(context);
+    // Mid-way through deleting the account the car is gone before the root has
+    // swapped this shell out; the tabs all assume a car, so render nothing.
+    if (state.vehicle == null) return const Scaffold();
+    final open = state.openAlerts;
     // Outline icons at rest; the filled glyph appears only inside the active circle.
     Widget alertsIcon(IconData icon) => Badge(isLabelVisible: open > 0, label: Text('$open'), child: Icon(icon));
     return Scaffold(

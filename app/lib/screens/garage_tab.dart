@@ -222,9 +222,13 @@ Future<void> _confirmDelete(BuildContext context) async {
       ],
     ),
   );
-  if (ok != true) return;
+  if (ok != true || !context.mounted) return;
+  final nav = Navigator.of(context);
   try {
     await s.deleteAccount();
+    // Start a clean route stack at the app root rather than morphing the tabs
+    // in place; the in-place swap left a blank screen.
+    nav.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const AppRoot()), (r) => false);
   } catch (e) {
     if (context.mounted) showError(context, e);
   }

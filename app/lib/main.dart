@@ -115,14 +115,15 @@ class _ConnectAppState extends State<ConnectApp> {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        home: const _Root(),
+        home: const AppRoot(),
       ),
     );
   }
 }
 
-class _Root extends StatelessWidget {
-  const _Root();
+/// The app's home: loading, error, welcome or the tabs, depending on state.
+class AppRoot extends StatelessWidget {
+  const AppRoot({super.key});
 
   @override
   Widget build(BuildContext context) {

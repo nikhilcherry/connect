@@ -50,9 +50,20 @@ class AppState extends ChangeNotifier {
     await _db.rpc('delete_my_account');
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
-    await _db.auth.signOut(scope: SignOutScope.local);
+    // The server no longer knows this user, so its logout call is refused
+    // (403); the local session still has to go.
+    try {
+      await _db.auth.signOut(scope: SignOutScope.local);
+    } catch (e) {
+      debugPrint('sign-out after deletion: $e');
+    }
+    _unsubscribeAll();
     vehicle = null;
+    vehicles = [];
+    tag = null;
     alerts = [];
+    family = [];
+    contacts = [];
     await bootstrap();
   }
 
