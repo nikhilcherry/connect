@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/models.dart';
 import '../l10n.dart';
 import '../main.dart';
+import '../services/bridge.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/motion.dart';
@@ -30,6 +31,8 @@ class _AlertThreadScreenState extends State<AlertThreadScreen> {
   int? _seenUpTo;
   RealtimeChannel? _channel;
   bool _sending = false;
+  final _dictation = Dictation();
+  bool _listening = false;
 
   @override
   void initState() {
@@ -65,6 +68,28 @@ class _AlertThreadScreenState extends State<AlertThreadScreen> {
         }
       });
     } catch (_) {}
+  }
+
+  Future<void> _dictate() async {
+    if (_listening) {
+      await _dictation.stop();
+      if (mounted) setState(() => _listening = false);
+      return;
+    }
+    final ok = await _dictation.start(L10n.lang.value, (text, done) {
+      if (!mounted) return;
+      setState(() {
+        _input.text = text;
+        _input.selection = TextSelection.collapsed(offset: text.length);
+        if (done) _listening = false;
+      });
+    });
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('Voice typing isn\'t available on this phone.'))));
+    } else {
+      setState(() => _listening = true);
+    }
   }
 
   Future<void> _send(String text, {bool onMyWay = false}) async {
@@ -210,6 +235,13 @@ class _AlertThreadScreenState extends State<AlertThreadScreen> {
                             decoration: InputDecoration(hintText: tr('Reply…'), counterText: ''),
                             onSubmitted: _send,
                           ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton.outlined(
+                          tooltip: _listening ? tr('Stop') : tr('Speak your reply'),
+                          style: IconButton.styleFrom(minimumSize: const Size(50, 50)),
+                          onPressed: _sending ? null : _dictate,
+                          icon: Icon(_listening ? Icons.stop_circle_outlined : Icons.mic_none),
                         ),
                         const SizedBox(width: 8),
                         IconButton.filled(
@@ -367,8 +399,75 @@ class _Bubble extends StatelessWidget {
             bottomRight: Radius.circular(mine ? 4 : DL.rCard),
           ),
         ),
-        child: Text(text, style: DLText.body.copyWith(height: 1.45, color: mine ? DL.onDark : DL.ink)),
+        child: mine
+            ? Text(text, style: DLText.body.copyWith(height: 1.45, color: DL.onDark))
+            : _Translatable(text: text),
       ),
     );
+  }
+}
+
+/// A stranger's message with an on-device "Translate" action: detects the
+/// language and translates into the app's language without leaving the phone.
+class _Translatable extends StatefulWidget {
+  const _Translatable({required this.text});
+  final String text;
+
+  @override
+  State<_Translatable> createState() => _TranslatableState();
+}
+
+class _TranslatableState extends State<_Translatable> {
+  String? _translated;
+  bool _busy = false;
+  bool _failed = false;
+
+  Future<void> _translate() async {
+    setState(() {
+      _busy = true;
+      _failed = false;
+    });
+    try {
+      final r = await translateTo(widget.text, L10n.lang.value);
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _translated = r == null || r.same ? null : r.text;
+        _failed = r == null;
+        if (r != null && r.same) _failed = false;
+      });
+      if (r != null && r.same && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('Already in your language.'))));
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _failed = true;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+      Text(widget.text, style: DLText.body.copyWith(height: 1.45, color: DL.ink)),
+      if (_translated != null) ...[
+        const SizedBox(height: 6),
+        Text(_translated!, style: DLText.body.copyWith(height: 1.45, color: DL.violet, fontWeight: FontWeight.w600)),
+      ],
+      const SizedBox(height: 4),
+      InkWell(
+        onTap: _busy ? null : _translate,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Text(
+            _busy ? tr('Translating…') : _failed ? tr('Couldn\'t translate. Tap to retry.') : _translated != null ? tr('Translated on this phone') : tr('Translate'),
+            style: DLText.small.copyWith(color: DL.muted, decoration: _translated == null ? TextDecoration.underline : null),
+          ),
+        ),
+      ),
+    ]);
   }
 }

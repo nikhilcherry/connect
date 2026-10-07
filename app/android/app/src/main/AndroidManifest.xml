@@ -11,6 +11,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <application
         android:label="Connect"
         android:name="${applicationName}"
@@ -58,6 +59,7 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <intent><action android:name="android.speech.RecognitionService"/></intent>
         <intent><action android:name="android.intent.action.SENDTO"/><data android:scheme="sms"/></intent>
         <intent><action android:name="android.intent.action.DIAL"/><data android:scheme="tel"/></intent>
         <intent>
