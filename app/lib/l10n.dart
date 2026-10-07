@@ -29,6 +29,10 @@ enum AppLang {
 class L10n {
   static final lang = ValueNotifier<AppLang>(AppLang.en);
   static Map<String, String> _table = const {};
+
+  /// Every language's table, so a message can be written in someone else's
+  /// language (quick replies go out in the stranger's language).
+  static final Map<String, Map<String, String>> _all = {};
   static const _pref = 'app_lang';
 
   static Future<void> load() async {
@@ -38,6 +42,19 @@ class L10n {
       l = AppLang.values.firstWhere((x) => x.code == saved, orElse: () => AppLang.en);
     } catch (_) {}
     await _apply(l);
+    await _preloadAll();
+  }
+
+  static Future<void> _preloadAll() async {
+    for (final l in AppLang.values.where((x) => x != AppLang.en)) {
+      if (_all.containsKey(l.code)) continue;
+      try {
+        final raw = await rootBundle.loadString('assets/l10n/${l.code}.json');
+        _all[l.code] = (jsonDecode(raw) as Map<String, dynamic>).cast<String, String>();
+      } catch (e) {
+        debugPrint('l10n ${l.code} preload failed: $e');
+      }
+    }
   }
 
   static Future<void> set(AppLang l) async {
@@ -73,6 +90,9 @@ class L10n {
 
   @visibleForTesting
   static void useTable(Map<String, String> t) => _table = t;
+
+  @visibleForTesting
+  static void useTableFor(AppLang l, Map<String, String> t) => _all[l.code] = t;
 }
 
 /// Translates [en] into the current language, filling `{name}` placeholders.
@@ -81,4 +101,13 @@ String tr(String en, [Map<String, Object?> args = const {}]) {
   if (s == null || s.isEmpty) s = en;
   if (args.isEmpty) return s;
   return s.replaceAllMapped(RegExp(r'\{(\w+)\}'), (m) => args.containsKey(m[1]) ? '${args[m[1]]}' : m[0]!);
+}
+
+
+/// [en] written in [lang] regardless of the app's own language, falling back
+/// to English when that language has no entry.
+String trIn(String en, AppLang lang) {
+  if (lang == AppLang.en) return en;
+  final s = L10n._all[lang.code]?[en];
+  return (s == null || s.isEmpty) ? en : s;
 }

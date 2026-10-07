@@ -273,11 +273,16 @@ class AppState extends ChangeNotifier {
     if (vehicle == null) {
       final row = await _db.from('vehicles').insert(fields).select().single();
       vehicle = Vehicle.fromJson(row);
+      vehicles = [...vehicles, vehicle!];
       final t = await _db.from('tags').insert({'vehicle_id': vehicle!.id}).select().single();
       tag = Tag.fromJson(t);
+      // The first car has to start listening for alerts straight away, not
+      // only after the next refresh.
+      _subscribe();
     } else {
       final row = await _db.from('vehicles').update(fields).eq('id', vehicle!.id).select().single();
       vehicle = Vehicle.fromJson(row);
+      vehicles = [for (final v in vehicles) v.id == vehicle!.id ? vehicle! : v];
     }
     await Notifications.scheduleExpiryReminders(vehicle);
     notifyListeners();

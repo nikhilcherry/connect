@@ -373,6 +373,22 @@ const dead = await scan({ action: "lookup", code }, ip);
 check(dead.status === 404, "deactivated tag stops working", dead);
 
 
+// --- the stranger's language travels with the alert
+{
+  const owner2 = await signIn();
+  const lp = `KA07LL${Math.floor(1000 + Math.random() * 8999)}`;
+  const lv = await rest(owner2, "POST", "vehicles", { reg_number: lp, make: "Honda", model: "Amaze" });
+  const lt = await rest(owner2, "POST", "tags", { vehicle_id: lv.data[0].id });
+  const kn = await scan({ action: "alert", code: lt.data[0].code, kind: "other", plate_last4: lp.slice(-4), lang: "kn" }, "10.9.2.1");
+  const bogus = await scan({ action: "alert", code: lt.data[0].code, kind: "other", plate_last4: lp.slice(-4), lang: "xx'; drop table alerts;--" }, "10.9.2.2");
+  const none = await scan({ action: "alert", code: lt.data[0].code, kind: "other", plate_last4: lp.slice(-4) }, "10.9.2.3");
+  check(kn.status === 200 && bogus.status === 200 && none.status === 200, "alerts accepted with and without a language", [kn, bogus, none]);
+  const rows = await rest(owner2, "GET", "alerts?select=id,scanner_lang");
+  const byId = Object.fromEntries(rows.data.map((r) => [r.id, r.scanner_lang]));
+  check(byId[kn.data.alert_id] === "kn", "owner sees the stranger's language", rows);
+  check(byId[bogus.data.alert_id] === "en" && byId[none.data.alert_id] === "en", "unknown or missing language falls back to English", rows);
+}
+
 // --- more than one car per account
 {
   const multi = await signIn();

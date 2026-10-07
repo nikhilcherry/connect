@@ -19,9 +19,15 @@ class AlertThreadScreen extends StatefulWidget {
 }
 
 class _AlertThreadScreenState extends State<AlertThreadScreen> {
-  // Sent in the owner's language: the stranger is usually a neighbour.
-  static List<String> get _quick =>
-      [tr('Coming in 2 minutes'), tr('Moving it now, sorry!'), tr('Thanks for letting me know'), tr('I\'m not nearby, sorry')];
+  // Shown in the owner's language, but sent in the one the stranger chose on
+  // the scan page: the app already carries every language's strings, so the
+  // reply is in their language without any machine translation.
+  static const _quickKeys = [
+    /*t*/'Coming in 2 minutes',
+    /*t*/'Moving it now, sorry!',
+    /*t*/'Thanks for letting me know',
+    /*t*/'I\'m not nearby, sorry',
+  ];
 
   final _input = TextEditingController();
   final _scroll = ScrollController();
@@ -219,11 +225,25 @@ class _AlertThreadScreenState extends State<AlertThreadScreen> {
                       child: ListView.separated(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         scrollDirection: Axis.horizontal,
-                        itemCount: _quick.length,
+                        itemCount: _quickKeys.length,
                         separatorBuilder: (_, _) => const SizedBox(width: 8),
-                        itemBuilder: (_, i) => ActionChip(label: Text(_quick[i]), onPressed: () => _send(_quick[i], onMyWay: i < 2)),
+                        itemBuilder: (_, i) => ActionChip(
+                          label: Text(tr(_quickKeys[i])),
+                          onPressed: () => _send(trIn(_quickKeys[i], alert.scannerLang), onMyWay: i < 2),
+                        ),
                       ),
                     ),
+                    if (alert.scannerLang != L10n.lang.value)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            tr('Quick replies are sent in {language}, their language', {'language': alert.scannerLang.native}),
+                            style: DLText.small.copyWith(color: DL.muted),
+                          ),
+                        ),
+                      ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
                       child: Row(children: [

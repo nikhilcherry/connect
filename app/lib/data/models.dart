@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' show IconData, Icons;
+import '../l10n.dart';
 
 class Vehicle {
   Vehicle({
@@ -139,11 +140,15 @@ class CarAlert {
     required this.updatedAt,
     this.note,
     this.photoPath,
+    this.scannerLang = AppLang.en,
   });
 
   final String id;
   final String vehicleId;
   final AlertKind kind;
+
+  /// The language the person at the car chose on the scan page.
+  final AppLang scannerLang;
   final AlertStatus status;
   final bool blocked;
   final String? note;
@@ -161,6 +166,7 @@ class CarAlert {
         blocked: j['blocked'] as bool? ?? false,
         note: j['note'] as String?,
         photoPath: j['photo_path'] as String?,
+        scannerLang: AppLang.values.firstWhere((l) => l.code == j['scanner_lang'], orElse: () => AppLang.en),
         createdAt: DateTime.parse(j['created_at'] as String).toLocal(),
         updatedAt: DateTime.parse(j['updated_at'] as String).toLocal(),
       );

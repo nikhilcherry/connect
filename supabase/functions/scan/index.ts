@@ -6,7 +6,7 @@
 // POST JSON { action, ... }:
 //   lookup  { code }                              -> vehicle make/model/colour only
 //   plate   { plate }                             -> { code } if a Connect car has that plate (plate-as-QR, OCR runs on-device)
-//   alert   { code, plate_last4, kind, note?, photo? } -> { alert_id, token }
+//   alert   { code, plate_last4, kind, note?, photo?, lang? } -> { alert_id, token }
 //   thread  { alert_id, token }                   -> { status, kind, note, messages, owner_status, medical }
 //   reply   { alert_id, token, body }             -> { ok }
 //   trip    { token }                             -> live position of a shared trip (web/trip.html)
@@ -26,6 +26,7 @@ const db = createClient(
 const LOCAL = (Deno.env.get("SUPABASE_URL") ?? "").startsWith("http://");
 const SALT = Deno.env.get("SCAN_IP_SALT") ?? (LOCAL ? "local-dev-salt" : null);
 
+const LANGS = new Set(["en", "hi", "kn", "ta"]);
 const KINDS = new Set(["blocking", "lights_on", "towing", "accident", "window_open", "other"]);
 const CODE_RE = /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{8}$/;
 const UUID_RE = /^[0-9a-f-]{36}$/;
@@ -254,6 +255,7 @@ Deno.serve(async (req) => {
         owner: tag.owner,
         kind: body.kind,
         note,
+        scanner_lang: typeof body.lang === "string" && LANGS.has(body.lang) ? body.lang : "en",
       }).select("id").single();
       if (error || !alert) return json({ error: "insert_failed" }, 500);
 
