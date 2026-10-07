@@ -29,7 +29,7 @@ A QR tag on the windshield turns "whose car is this?" into a private two-way cha
 1. **Scan** the tag: the page shows only the car's colour, make and model.
 2. **Pick a reason**: blocking a car, lights on, being towed, window open, accident or damage, or a note. Optionally attach a photo, which is shrunk in the browser.
 3. **Prove you're there**: type the last 4 characters of the number plate. A shared photo of the sticker isn't enough.
-4. **Chat**: quick replies or free text; if the signal drops (a basement, a lift) the page keeps your message and sends it by itself when you are back online; a line tells you when "the owner has seen your message" (set when the owner opens the thread, before any reply); see "Owner is on the way", the owner's "back by 6:30" status and, on accident reports, any medical info the owner chose to share.
+4. **Chat**: quick replies or free text; if the signal drops (a basement, a lift) the page keeps your message and sends it by itself when you are back online; a line tells you when "the owner has seen your message", and after five minutes of silence the page suggests what to do next (ask nearby security or a neighbour) (set when the owner opens the thread, before any reply); see "Owner is on the way", the owner's "back by 6:30" status and, on accident reports, any medical info the owner chose to share.
 
 ### For the owner (Android app)
 

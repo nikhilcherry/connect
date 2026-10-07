@@ -188,6 +188,7 @@
     <div class="card">
       <div class="status"><span class="dot" id="dot"></span><svg class="check hidden" id="check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="var(--success)" stroke-width="2.5" stroke-linecap="square"/></svg><span id="status-text"></span></div>
       <p class="muted" id="status-sub" style="margin-top:6px"></p>
+      <p class="muted hidden" id="wait-hint" style="margin-top:8px"></p>
       <div class="medical hidden" id="medical"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15"/><path d="M12 9v7M8.5 12.5h7M9 5V3h6v2"/></svg><div><b id="medical-title"></b><span id="medical-blood"></span><span id="medical-note" style="display:block"></span><span class="muted" id="medical-tell" style="color:var(--error)"></span></div></div>
       <div class="backby hidden" id="back-by"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><div><b id="back-by-time"></b><span class="muted" id="back-by-note"></span></div></div>
       <div class="msgs" id="msgs" aria-live="polite"></div>
@@ -234,6 +235,7 @@
       status_open: "Owner notified", status_on_my_way: "Owner is on the way", status_resolved: "Marked as sorted",
       sub_open: "Keep this page open. Replies appear here.",
       sub_open_seen: "The owner has seen your message. Replies appear here.",
+      waitHint: "No answer yet? The owner may be away from their phone. If it can't wait, ask nearby security or a neighbour.",
       sub_on_my_way: "They've seen your message.",
       sub_resolved: "Thanks for helping out.",
       replyPh: "Reply to the owner…",
@@ -272,6 +274,7 @@
       status_open: "मालिक को सूचना भेज दी गई", status_on_my_way: "मालिक आ रहे हैं", status_resolved: "समस्या सुलझ गई",
       sub_open: "यह पेज खुला रखें। जवाब यहीं दिखेंगे।",
       sub_open_seen: "मालिक ने आपका संदेश देख लिया है। जवाब यहीं दिखेंगे।",
+      waitHint: "अभी तक जवाब नहीं आया? हो सकता है मालिक फ़ोन से दूर हों। अगर इंतज़ार नहीं हो सकता, तो पास के सिक्योरिटी या पड़ोसी से कहें।",
       sub_on_my_way: "उन्होंने आपका संदेश देख लिया है।",
       sub_resolved: "मदद करने के लिए धन्यवाद।",
       replyPh: "मालिक को जवाब दें…",
@@ -310,6 +313,7 @@
       status_open: "ಮಾಲೀಕರಿಗೆ ತಿಳಿಸಲಾಗಿದೆ", status_on_my_way: "ಮಾಲೀಕರು ಬರುತ್ತಿದ್ದಾರೆ", status_resolved: "ಸರಿಯಾಗಿದೆ ಎಂದು ಗುರುತಿಸಲಾಗಿದೆ",
       sub_open: "ಈ ಪುಟ ತೆರೆದಿಡಿ. ಉತ್ತರಗಳು ಇಲ್ಲಿ ಕಾಣುತ್ತವೆ.",
       sub_open_seen: "ಮಾಲೀಕರು ನಿಮ್ಮ ಸಂದೇಶ ನೋಡಿದ್ದಾರೆ. ಉತ್ತರಗಳು ಇಲ್ಲಿ ಕಾಣುತ್ತವೆ.",
+      waitHint: "ಇನ್ನೂ ಉತ್ತರ ಬಂದಿಲ್ಲವೇ? ಮಾಲೀಕರು ಫೋನ್‌ನಿಂದ ದೂರ ಇರಬಹುದು. ಕಾಯಲಾಗದಿದ್ದರೆ ಹತ್ತಿರದ ಸೆಕ್ಯುರಿಟಿ ಅಥವಾ ನೆರೆಯವರಿಗೆ ಹೇಳಿ.",
       sub_on_my_way: "ಅವರು ನಿಮ್ಮ ಸಂದೇಶ ನೋಡಿದ್ದಾರೆ.",
       sub_resolved: "ಸಹಾಯ ಮಾಡಿದ್ದಕ್ಕೆ ಧನ್ಯವಾದ.",
       replyPh: "ಮಾಲೀಕರಿಗೆ ಉತ್ತರಿಸಿ…",
@@ -348,6 +352,7 @@
       status_open: "உரிமையாளருக்குத் தெரிவிக்கப்பட்டது", status_on_my_way: "உரிமையாளர் வருகிறார்", status_resolved: "சரியானது எனக் குறிக்கப்பட்டது",
       sub_open: "இந்தப் பக்கத்தைத் திறந்து வையுங்கள். பதில்கள் இங்கே தோன்றும்.",
       sub_open_seen: "உரிமையாளர் உங்கள் செய்தியைப் பார்த்துவிட்டார். பதில்கள் இங்கே தோன்றும்.",
+      waitHint: "இன்னும் பதில் வரவில்லையா? உரிமையாளர் தொலைபேசியிலிருந்து விலகி இருக்கலாம். காத்திருக்க முடியாவிட்டால் அருகிலுள்ள காவலர் அல்லது அண்டை வீட்டாரிடம் சொல்லுங்கள்.",
       sub_on_my_way: "அவர்கள் உங்கள் செய்தியைப் பார்த்துவிட்டார்கள்.",
       sub_resolved: "உதவியதற்கு நன்றி.",
       replyPh: "உரிமையாளருக்குப் பதிலளி…",
@@ -391,7 +396,7 @@
   const saved = store.get("dlc-lang");
   const browser = (navigator.language || "en").slice(0, 2);
   let lang = LANGS.includes(saved) ? saved : LANGS.includes(browser) ? browser : "en";
-  let code = null, kind = null, thread = null, pollTimer = null, lastStatus = null, lastSeen = false, lastBackBy = null, lastMedical = null, photo = null;
+  let code = null, kind = null, thread = null, pollTimer = null, lastStatus = null, lastSeen = false, threadAt = Date.now(), lastBackBy = null, lastMedical = null, photo = null;
   const t = (k) => STR[lang][k] ?? STR.en[k] ?? k;
   const errText = (c) => (STR.en[`err_${c}`] ? t(`err_${c}`) : t("err_generic"));
 
@@ -475,6 +480,7 @@
     try {
       const r = await call({ action: "alert", code, kind, plate_last4: $("plate").value, note: $("note").value, photo, lang });
       thread = { alert_id: r.alert_id, token: r.token };
+      threadAt = Date.now();
       store.set(`dlc-thread-${code}`, JSON.stringify({ ...thread, at: Date.now() }));
       openThread();
     } catch (e) {
@@ -581,10 +587,21 @@
     }
   }
 
+  // Five minutes with no sign of the owner: say what to do next instead of
+  // leaving the person at the car staring at "keep this page open".
+  const WAIT_HINT_MS = 5 * 60 * 1000;
+  function renderWaitHint(r) {
+    const silent = r.status === "open" && !r.seen && !(r.messages || []).some((m) => m.sender === "owner");
+    const show = silent && Date.now() - threadAt >= WAIT_HINT_MS;
+    $("wait-hint").textContent = show ? t("waitHint") : "";
+    $("wait-hint").classList.toggle("hidden", !show);
+  }
+
   async function poll() {
     try {
       const r = await call({ action: "thread", ...thread });
       renderStatus(r.status, !!r.seen);
+      renderWaitHint(r);
       renderBackBy(r.owner_status);
       renderMedical(r.medical);
       renderMessages(r);
@@ -703,7 +720,7 @@
     // Coming back to the page within 6 hours resumes the conversation.
     try {
       const saved = JSON.parse(store.get(`dlc-thread-${code}`) || "null");
-      if (saved && Date.now() - saved.at < 6 * 3600e3) thread = saved;
+      if (saved && Date.now() - saved.at < 6 * 3600e3) { thread = saved; threadAt = saved.at; }
     } catch {}
 
     try {
