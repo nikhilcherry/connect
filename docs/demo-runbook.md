@@ -11,13 +11,14 @@ A 3-minute live demo using only flows that were run end to end. Where something 
 ## The 3 minutes
 1. **The problem (20 s).** "Blocked in, lights on, no number to call."
 2. **Stranger scans the QR (40 s).** Second phone scans the tag, picks *Lights are on*, types the last 4 plate characters, sends. Owner phone buzzes. Reply "Coming in 2 minutes". Both sides never see a number.
-3. **Plate is the QR (40 s).** Owner phone: Garage → *Reach a car by its plate* → photograph the plate. It reads on the phone, finds the car. *Verified on an emulator, not a real iQOO camera.* Fallback: type the plate; the lookup is identical.
+3. **Plate is the QR (50 s).** Owner phone: Garage → *Reach a car by its plate* → **Live camera view**. Point at a plate: our own detector draws a box on it in real time (it shows the milliseconds). Tap the box: it reads the plate and finds the car. *Verified on an emulator camera scene, not a real iQOO camera.* Fallback: *Photograph the plate*, or type it; the lookup is identical.
 4. **Translate (30 s).** Stranger sends a Hindi message; tap **Translate** → English, "Translated on this phone". Say it's offline after the pack downloads.
 5. **Voice reply (20 s).** Tap the mic and speak a reply. *Recogniser starts (verified); spoken transcription not verified on a real phone.* Fallback: tap a quick reply.
 6. **Privacy line (20 s).** Strangers see colour, make and model only; photos are read on the phone and never uploaded; Garage → *Delete my account* removes everything.
 7. **Close (10 s).** "Every car gets a voice."
 
 ## Honest answers to likely questions
+- *Did you build an ML model?* Yes: a YOLO11n plate detector trained on 8,823 plate photos (CC BY 4.0 dataset), test mAP50 0.991, 10 MB, runs on the phone with ONNX Runtime (`ml/`). The text reading is Google ML Kit, not ours, and the training photos are mostly not Indian, so say that before they ask.
 - *Does it understand a photo of the problem?* Only on clear signs (wreck, tow truck, a gate in frame). ML Kit's base model labels every car "Vehicle, Car, Wheel, Road, Bumper", so for anything else it leaves the choice to the person. Say so before they find out.
 - *Can someone squat my plate?* A plate claimed by two accounts is refused by the lookup, so a message is never routed to a possible squatter. Proof of ownership (RC photo) is the next step.
 - *Cost?* ₹0 a month on free tiers; the free Supabase plan caps live connections at 200 and the app disconnects in the background once push is on.
