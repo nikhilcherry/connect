@@ -175,7 +175,7 @@ class _PlateScanScreenState extends State<PlateScanScreen> {
           if (_code != null) ...[
             const SizedBox(height: 16),
             SectionCard(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 Label(tr('This car is on Connect')),
                 const SizedBox(height: 8),
                 Text(tr('Add a photo of the problem and your phone will suggest what to tell the owner.'), style: DLText.body),
