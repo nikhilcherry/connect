@@ -9,7 +9,7 @@ A QR tag on the windshield turns "whose car is this?" into a private two-way cha
 | **Platform** | Android (Flutter) + static web scan page + Supabase backend |
 | **Running cost** | ₹0 / month on free tiers |
 | **Languages** | English, हिन्दी, ಕನ್ನಡ, தமிழ் (app, scan page and trip page) |
-| **Tests** | 119 backend end-to-end checks · 49 app tests |
+| **Tests** | 119 backend end-to-end checks · 49 app tests · 3 on-device ML checks |
 
 ---
 
@@ -117,7 +117,7 @@ node supabase/tests/e2e.mjs
 # 3. Scan and trip pages on :8093 (serves config.local.js when present)
 python3 web/serve.py                       # /t/<TAG CODE> and /trip#<TOKEN>
 
-# 4. App
+# 4. App (on-device ML checks need an emulator/phone: adb push app/integration_test/assets/plate.png /data/local/tmp/ && flutter test integration_test -d <device>)
 cd app && flutter test
 flutter run -d chrome --dart-define=SCAN_BASE_URL=http://127.0.0.1:8093   # quickest UI loop
 flutter build apk --debug                                                # emulator reaches the host at 10.0.2.2

@@ -19,12 +19,21 @@ List<String> extractPlates(String text) {
   final chunks = [...text.split('\n'), text.replaceAll('\n', ' ')];
   for (final chunk in chunks) {
     final s = chunk.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
-    for (var i = 0; i < s.length; i++) {
+    var i = 0;
+    while (i < s.length) {
+      var hit = 0;
+      // Longest plate shape first; once one matches, skip past it so its own
+      // fragments are not reported as further plates.
       for (final len in const [10, 9, 8]) {
         if (i + len > s.length) continue;
         final p = _repair(s.substring(i, i + len));
-        if (p != null) add(p);
+        if (p != null) {
+          add(p);
+          hit = len;
+          break;
+        }
       }
+      i += hit == 0 ? 1 : hit;
     }
   }
   return found;
