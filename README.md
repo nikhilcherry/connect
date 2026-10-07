@@ -11,6 +11,15 @@ A QR tag on the windshield turns "whose car is this?" into a private two-way cha
 | **Languages** | English, हिन्दी, ಕನ್ನಡ, தமிழ் (app, scan page and trip page) |
 | **Tests** | 119 backend end-to-end checks · 49 app tests · 3 on-device ML checks |
 
+
+<p align="center">
+  <img src="docs/screens/home.png" width="22%" alt="Home">
+  <img src="docs/screens/tag.png" width="22%" alt="Your tag">
+  <img src="docs/screens/plate.png" width="22%" alt="Reach a car by its plate">
+  <img src="docs/screens/alert-translate.png" width="22%" alt="Alert thread with on-device translation">
+</p>
+<p align="center"><sub>Captured from the release build on an Android 15 emulator: home, the tag, plate-as-QR, and an alert translated on the phone.</sub></p>
+
 ---
 
 ## What the app does
