@@ -124,9 +124,10 @@ class _AlertThreadScreenState extends State<AlertThreadScreen> {
       return const Scaffold(body: Center(child: SizedBox.square(dimension: 28, child: CircularProgressIndicator(strokeWidth: 2.5))));
     }
     final resolved = alert.status == AlertStatus.resolved;
+    final by = s.handlerName(alert); // someone else in the family took it
     final (tone, label) = switch (alert.status) {
       AlertStatus.open => (alert.kind.urgent ? Tone.error : Tone.info, alert.kind.urgent ? tr('Urgent') : tr('New')),
-      AlertStatus.onMyWay => (Tone.neutral, tr('On my way')),
+      AlertStatus.onMyWay => (Tone.neutral, by == null ? tr('On my way') : tr('On the way')),
       AlertStatus.resolved => (Tone.success, tr('Sorted')),
     };
     final v = s.vehicle;
@@ -197,6 +198,15 @@ class _AlertThreadScreenState extends State<AlertThreadScreen> {
                     ),
                   ),
                 ]),
+              ),
+            if (by != null && alert.status != AlertStatus.open)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  alert.status == AlertStatus.resolved ? tr('Sorted by {name}', {'name': by}) : tr('{name} is on the way', {'name': by}),
+                  textAlign: TextAlign.center,
+                  style: DLText.small.copyWith(color: DL.muted, fontWeight: FontWeight.w700),
+                ),
               ),
             _Bubble(text: alert.note?.isNotEmpty == true ? alert.note! : tr(alert.kind.label), mine: false),
             for (final m in _messages) _Bubble(key: ValueKey(m.id), text: m.body, mine: m.fromOwner, animate: m.id > (_seenUpTo ?? 1 << 62)),

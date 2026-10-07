@@ -183,6 +183,18 @@ const badJoin = await rest(member, "POST", "rpc/accept_vehicle_invite", { p_code
 check(badJoin.status === 200 && badJoin.data === null, "wrong invite code joins nothing", badJoin);
 const join = await rest(member, "POST", "rpc/accept_vehicle_invite", { p_code: inv.data.toLowerCase(), p_name: "Amma" });
 check(join.data === vehicleId, "family member joins with the code", join);
+{
+  const memberId = JSON.parse(atob(member.split(".")[1])).sub;
+  const take = await rest(member, "PATCH", `alerts?id=eq.${alert_id}`, { status: "on_my_way", handled_by: memberId });
+  check(take.status < 300, "a family member can take an alert", take);
+  const seenByOwner = await rest(owner, "GET", `alerts?id=eq.${alert_id}&select=status,handled_by`);
+  check(seenByOwner.data[0]?.handled_by === memberId, "the owner sees who took it", seenByOwner);
+  const strangerView = await scan({ action: "thread", alert_id, token }, "10.9.4.1");
+  check(!("handled_by" in strangerView.data) && !JSON.stringify(strangerView.data).includes(memberId), "the person at the car is not told who", strangerView);
+  const outsider = await rest(third, "PATCH", `alerts?id=eq.${alert_id}`, { handled_by: memberId });
+  const unchanged = await rest(owner, "GET", `alerts?id=eq.${alert_id}&select=handled_by`);
+  check(unchanged.data[0].handled_by === memberId, "someone outside the family cannot change it", [outsider, unchanged]);
+}
 const reuse = await rest(third, "POST", "rpc/accept_vehicle_invite", { p_code: inv.data, p_name: "X" });
 check(reuse.data === null, "an invite code works only once", reuse);
 

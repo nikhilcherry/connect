@@ -9,7 +9,7 @@ A QR tag on the windshield turns "whose car is this?" into a private two-way cha
 | **Platform** | Android (Flutter) + static web scan page + Supabase backend |
 | **Running cost** | ₹0 / month on free tiers |
 | **Languages** | English, हिन्दी, ಕನ್ನಡ, தமிழ் (app, scan page and trip page) |
-| **Tests** | 126 backend end-to-end checks · 53 app tests · 3 on-device ML checks |
+| **Tests** | 130 backend end-to-end checks · 53 app tests · 3 on-device ML checks |
 
 
 <p align="center">
@@ -45,7 +45,7 @@ A QR tag on the windshield turns "whose car is this?" into a private two-way cha
 
 - **Tag**: an 8-character code printed as a QR sticker (share it as an image for a print shop), which can be paused or replaced.
 - **"Back by 6:30"**: tells people who message you when you'll return. Shown only after the plate check, never from a bare scan, and it clears itself when the time passes.
-- **Family sharing**: a one-time 6-character code adds up to 5 people. Everyone gets the alerts; only the owner can change the plate or the tag.
+- **Family sharing**: a one-time 6-character code adds up to 5 people. Everyone gets the alerts, and when someone taps "On my way" or "Sorted" the others see who ("Priya is on the way"), so two people don't both rush to the car; the person at the car is never told who; only the owner can change the plate or the tag.
 - **Where did I park**: location, note, photo and a paid-parking reminder, stored only on the phone.
 - **Medical info**: opt-in blood group and allergies, shown to a stranger only on an accident report.
 - **Photos on alerts**: kept in a private bucket, opened through expiring links, deleted after 7 days.

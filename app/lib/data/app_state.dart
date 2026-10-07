@@ -508,8 +508,18 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// Who took [a], from this phone's point of view; null when nobody did or it
+  /// was me.
+  String? handlerName(CarAlert a) {
+    final id = a.handledBy;
+    if (id == null || id == userId) return null;
+    final m = family.where((f) => f.userId == id).firstOrNull;
+    return m?.name ?? tr('The owner');
+  }
+
   Future<void> setStatus(String alertId, AlertStatus status) async {
-    await _db.from('alerts').update({'status': status.wire}).eq('id', alertId);
+    // Record who took it, so the rest of the family can see.
+    await _db.from('alerts').update({'status': status.wire, 'handled_by': status == AlertStatus.open ? null : userId}).eq('id', alertId);
     await _loadAlerts();
     notifyListeners();
   }

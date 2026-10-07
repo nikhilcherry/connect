@@ -142,6 +142,7 @@ class CarAlert {
     this.photoPath,
     this.scannerLang = AppLang.en,
     this.seenAt,
+    this.handledBy,
   });
 
   final String id;
@@ -154,6 +155,9 @@ class CarAlert {
   /// When the owner (or family) first opened this alert; the person at the car
   /// is told "the owner has seen your message".
   final DateTime? seenAt;
+
+  /// The family member who last set this alert to "on my way" or "sorted".
+  final String? handledBy;
   final AlertStatus status;
   final bool blocked;
   final String? note;
@@ -172,6 +176,7 @@ class CarAlert {
         note: j['note'] as String?,
         photoPath: j['photo_path'] as String?,
         scannerLang: AppLang.values.firstWhere((l) => l.code == j['scanner_lang'], orElse: () => AppLang.en),
+        handledBy: j['handled_by'] as String?,
         seenAt: j['seen_at'] == null ? null : DateTime.parse(j['seen_at'] as String).toLocal(),
         createdAt: DateTime.parse(j['created_at'] as String).toLocal(),
         updatedAt: DateTime.parse(j['updated_at'] as String).toLocal(),
