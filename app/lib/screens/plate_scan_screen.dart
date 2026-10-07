@@ -12,6 +12,7 @@ import '../services/situation.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/motion.dart';
+import 'live_plate_screen.dart';
 
 enum _Phase { idle, reading, ready, searching, notFound }
 
@@ -64,6 +65,17 @@ class _PlateScanScreenState extends State<PlateScanScreen> {
         });
       }
     }
+  }
+
+  /// The live view: look around with boxes drawn on every plate, tap one.
+  Future<void> _live() async {
+    final plate = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => const LivePlateScreen()));
+    if (plate == null || !mounted) return;
+    setState(() {
+      _plate.text = plate;
+      _error = null;
+    });
+    await _find();
   }
 
   Future<void> _find() async {
@@ -142,6 +154,12 @@ class _PlateScanScreenState extends State<PlateScanScreen> {
             onPressed: busy ? null : _capture,
             icon: const Icon(Icons.photo_camera_outlined),
             label: Text(_phase == _Phase.reading ? tr('Reading…') : tr('Photograph the plate')),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: busy ? null : _live,
+            icon: const Icon(Icons.center_focus_strong_outlined),
+            label: Text(tr('Live camera view')),
           ),
           const SizedBox(height: 24),
           FieldLabel(tr('Number plate')),

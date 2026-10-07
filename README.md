@@ -9,16 +9,17 @@ A QR tag on the windshield turns "whose car is this?" into a private two-way cha
 | **Platform** | Android (Flutter) + static web scan page + Supabase backend |
 | **Running cost** | ₹0 / month on free tiers |
 | **Languages** | English, हिन्दी, ಕನ್ನಡ, தமிழ் (app, scan page and trip page) |
-| **Tests** | 130 backend end-to-end checks · 59 app tests · 4 on-device ML checks |
+| **Tests** | 130 backend end-to-end checks · 63 app tests · 8 on-device ML checks |
 
 
 <p align="center">
-  <img src="docs/screens/home.png" width="22%" alt="Home">
-  <img src="docs/screens/tag.png" width="22%" alt="Your tag">
-  <img src="docs/screens/plate.png" width="22%" alt="Reach a car by its plate">
-  <img src="docs/screens/alert-translate.png" width="22%" alt="Alert thread with on-device translation">
+  <img src="docs/screens/home.png" width="18%" alt="Home">
+  <img src="docs/screens/tag.png" width="18%" alt="Your tag">
+  <img src="docs/screens/plate.png" width="18%" alt="Reach a car by its plate">
+  <img src="docs/screens/live-plate.png" width="18%" alt="Live view: our detector boxes the plate">
+  <img src="docs/screens/alert-translate.png" width="18%" alt="Alert thread with on-device translation">
 </p>
-<p align="center"><sub>Captured from the release build on an Android 15 emulator: home, the tag, plate-as-QR, and an alert translated on the phone.</sub></p>
+<p align="center"><sub>Captured from the release build on an Android 15 emulator: home, the tag, plate-as-QR, the live view where our own detector boxes the plate, and an alert translated on the phone.</sub></p>
 
 ---
 

@@ -165,6 +165,54 @@ class Pixels {
   }
 }
 
+/// A camera frame (YUV 4:2:0, as Android delivers it) → upright RGBA pixels.
+/// [rotation] is how many degrees clockwise the frame must be turned to stand
+/// upright (the sensor's orientation, 90 on most phones held in portrait).
+/// Pure, so it is unit-tested; the live view calls it for every processed frame.
+Pixels yuv420ToPixels({
+  required Uint8List y,
+  required Uint8List u,
+  required Uint8List v,
+  required int width,
+  required int height,
+  required int yRowStride,
+  required int uvRowStride,
+  required int uvPixelStride,
+  int rotation = 0,
+}) {
+  final swap = rotation == 90 || rotation == 270;
+  final ow = swap ? height : width, oh = swap ? width : height;
+  final out = Uint8List(ow * oh * 4);
+  for (var oy = 0; oy < oh; oy++) {
+    for (var ox = 0; ox < ow; ox++) {
+      final int sx, sy;
+      switch (rotation) {
+        case 90:
+          sx = oy;
+          sy = height - 1 - ox;
+        case 180:
+          sx = width - 1 - ox;
+          sy = height - 1 - oy;
+        case 270:
+          sx = width - 1 - oy;
+          sy = ox;
+        default:
+          sx = ox;
+          sy = oy;
+      }
+      final yy = y[sy * yRowStride + sx];
+      final uvi = (sy >> 1) * uvRowStride + (sx >> 1) * uvPixelStride;
+      final uu = u[uvi] - 128, vv = v[uvi] - 128;
+      final o = (oy * ow + ox) * 4;
+      out[o] = (yy + 1.402 * vv).round().clamp(0, 255);
+      out[o + 1] = (yy - 0.344136 * uu - 0.714136 * vv).round().clamp(0, 255);
+      out[o + 2] = (yy + 1.772 * uu).round().clamp(0, 255);
+      out[o + 3] = 255;
+    }
+  }
+  return Pixels(out, ow, oh);
+}
+
 /// The on-device plate detector: a YOLO11n we trained on 8,823 plate photos,
 /// run with ONNX Runtime. See ml/README.md for how it was built and scored.
 class PlateDetector {

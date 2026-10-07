@@ -16,6 +16,7 @@ Float32List output(int n, List<List<double>> hits) {
 }
 
 void main() {
+  yuvTests();
   group('Letterbox', () {
     test('a wide photo is scaled to the width and padded top and bottom', () {
       final lb = Letterbox.fit(832, 416, 416);
@@ -83,5 +84,54 @@ void main() {
     expect(input[1 * 4 + 0], 1.0); // image row, red
     expect(input[plane + 1 * 4 + 0], 0.0); // image row, green
     expect(input[3 * 4 + 0], closeTo(114 / 255, 1e-6)); // bottom padding
+  });
+}
+
+void yuvTests() {
+  group('yuv420ToPixels', () {
+    // 4x2 frame: left half bright (Y 200), right half dark (Y 50), neutral chroma.
+    final y = Uint8List.fromList([200, 200, 50, 50, 200, 200, 50, 50]);
+    final u = Uint8List.fromList([128, 128]); // (4/2) x (2/2) chroma samples
+    final v = Uint8List.fromList([128, 128]);
+
+    test('neutral chroma gives grey of the luma value', () {
+      final px = yuv420ToPixels(y: y, u: u, v: v, width: 4, height: 2, yRowStride: 4, uvRowStride: 2, uvPixelStride: 1);
+      expect(px.width, 4);
+      expect(px.height, 2);
+      expect(px.rgba.sublist(0, 4), [200, 200, 200, 255]);
+      expect(px.rgba.sublist(12, 16), [50, 50, 50, 255]);
+    });
+
+    test('rotating 90 degrees swaps the size and turns the picture clockwise', () {
+      final px = yuv420ToPixels(y: y, u: u, v: v, width: 4, height: 2, yRowStride: 4, uvRowStride: 2, uvPixelStride: 1, rotation: 90);
+      expect(px.width, 2);
+      expect(px.height, 4);
+      // Turned clockwise, the bright left half ends up on top, the dark right half below.
+      expect(px.rgba[0], 200); // top row
+      expect(px.rgba[(3 * 2) * 4], 50); // bottom row
+    });
+
+    test('honours a padded row stride', () {
+      // Same frame but each Y row padded to 6 bytes.
+      final padded = Uint8List.fromList([200, 200, 50, 50, 0, 0, 200, 200, 50, 50, 0, 0]);
+      final px = yuv420ToPixels(y: padded, u: u, v: v, width: 4, height: 2, yRowStride: 6, uvRowStride: 2, uvPixelStride: 1);
+      expect(px.rgba.sublist(16, 20), [200, 200, 200, 255]); // second row, first pixel
+    });
+
+    test('saturated red chroma comes out red', () {
+      final px = yuv420ToPixels(
+        y: Uint8List.fromList([76, 76]),
+        u: Uint8List.fromList([85]),
+        v: Uint8List.fromList([255]),
+        width: 2,
+        height: 1,
+        yRowStride: 2,
+        uvRowStride: 1,
+        uvPixelStride: 1,
+      );
+      expect(px.rgba[0], greaterThan(200));
+      expect(px.rgba[1], lessThan(60));
+      expect(px.rgba[2], lessThan(60));
+    });
   });
 }
