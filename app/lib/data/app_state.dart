@@ -14,7 +14,7 @@ class AppState extends ChangeNotifier {
   AppState(this._db);
 
   final SupabaseClient _db;
-  RealtimeChannel? _channel;
+  final Map<String, RealtimeChannel> _channels = {};
 
   bool loading = true;
   String? loadError;
@@ -146,10 +146,15 @@ class AppState extends ChangeNotifier {
 
   void onBackground() {
     _foreground = false;
-    if (!pushActive || _channel == null) return;
-    _db.removeChannel(_channel!);
-    _channel = null;
-    _channelVehicle = null;
+    if (!pushActive) return;
+    _unsubscribeAll();
+  }
+
+  void _unsubscribeAll() {
+    for (final c in _channels.values) {
+      _db.removeChannel(c);
+    }
+    _channels.clear();
   }
 
   Future<void> _loadFamily() async {
@@ -170,8 +175,6 @@ class AppState extends ChangeNotifier {
     final rows = await _db.from('emergency_contacts').select().order('created_at', ascending: true);
     contacts = rows.map(EmergencyContact.fromJson).toList();
   }
-
-  String? _channelVehicle;
 
   Future<void> _loadSocieties() async {
     try {
@@ -201,32 +204,35 @@ class AppState extends ChangeNotifier {
     notices = n.map(SocietyNotice.fromJson).toList();
   }
 
-  /// Listens by vehicle rather than owner so family members get alerts too.
+  /// Listens by vehicle rather than owner so family members get alerts too,
+  /// and on every car in the account, not just the one on screen. Channels
+  /// share one socket, so this does not add connections against the free
+  /// plan's 200-connection limit.
   void _subscribe() {
-    final vid = vehicle?.id;
-    if (vid == _channelVehicle) return;
-    if (_channel != null) _db.removeChannel(_channel!);
-    _channel = null;
-    _channelVehicle = vid;
-    if (vid == null) return;
-    _channel = _db
-        .channel('vehicle-$vid')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'alerts',
-          filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'vehicle_id', value: vid),
-          callback: (payload) async {
-            final isNew = payload.eventType == PostgresChangeEvent.insert;
-            await _loadAlerts();
-            notifyListeners();
-            if (isNew) {
-              final a = CarAlert.fromJson(payload.newRecord);
-              Notifications.showAlert(a, vehicle);
-            }
-          },
-        )
-        .subscribe();
+    final ids = vehicles.map((v) => v.id).toSet();
+    for (final gone in _channels.keys.where((k) => !ids.contains(k)).toList()) {
+      _db.removeChannel(_channels.remove(gone)!);
+    }
+    for (final id in ids.where((id) => !_channels.containsKey(id))) {
+      _channels[id] = _db
+          .channel('vehicle-$id')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'alerts',
+            filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'vehicle_id', value: id),
+            callback: (payload) async {
+              final isNew = payload.eventType == PostgresChangeEvent.insert;
+              await _loadAlerts();
+              notifyListeners();
+              if (isNew) {
+                final a = CarAlert.fromJson(payload.newRecord);
+                Notifications.showAlert(a, vehicles.where((v) => v.id == id).firstOrNull ?? vehicle);
+              }
+            },
+          )
+          .subscribe();
+    }
   }
 
   // ---------------------------------------------------------------- vehicle + tag
@@ -500,7 +506,7 @@ class AppState extends ChangeNotifier {
 
   @override
   void dispose() {
-    if (_channel != null) _db.removeChannel(_channel!);
+    _unsubscribeAll();
     super.dispose();
   }
 }
