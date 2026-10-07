@@ -35,7 +35,7 @@ class Letterbox {
 
 /// The detector's own tuning. Trained at 416 px; see ml/README.md.
 const plateModelSize = 416;
-const plateModelAsset = 'assets/models/plate_n.onnx';
+const plateModelAsset = 'assets/models/plate_detector.onnx';
 
 /// Turns the model's raw output (channel-major [x, y, w, h, score] per
 /// candidate, in letterboxed pixels) into boxes in the original image, after
@@ -134,6 +134,20 @@ class Pixels {
     img.dispose();
     codec.dispose();
     return px;
+  }
+
+  /// The RGBA pixels of [box] grown by [pad] (a fraction of its size) on each side.
+  Pixels crop(PlateBox box, {double pad = 0.06}) {
+    final l = math.max(0, box.left - box.width * pad).floor();
+    final t = math.max(0, box.top - box.height * pad).floor();
+    final r = math.min(width, box.right + box.width * pad).ceil();
+    final b = math.min(height, box.bottom + box.height * pad).ceil();
+    final cw = r - l, ch = b - t;
+    final out = Uint8List(cw * ch * 4);
+    for (var y = 0; y < ch; y++) {
+      out.setRange(y * cw * 4, (y + 1) * cw * 4, rgba, ((t + y) * width + l) * 4);
+    }
+    return Pixels(out, cw, ch);
   }
 
   /// A PNG of [box] grown by [pad] (a fraction of its size) on each side, for

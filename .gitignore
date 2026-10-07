@@ -14,3 +14,7 @@ ml/runs/
 
 ml/*.pt
 !ml/weights/*.pt
+
+ml/weights/*.onnx
+
+__pycache__/

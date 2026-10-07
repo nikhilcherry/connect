@@ -14,6 +14,8 @@ data = os.path.expanduser(os.environ.get("PLATES_YAML", "~/ml-data/plates/plates
 epochs = int(os.environ.get("EPOCHS", "40"))
 imgsz = int(os.environ.get("IMGSZ", "416"))
 base = os.environ.get("BASE", "yolo11n.pt")
+name = os.environ.get("NAME", "plate_n")
+lr0 = float(os.environ.get("LR0", "0.01"))
 
 model = YOLO(base)
 model.train(
@@ -23,7 +25,8 @@ model.train(
     batch=32,
     workers=4,
     project=os.path.join(os.path.dirname(os.path.abspath(__file__)), "runs"),
-    name="plate_n",
+    name=name,
+    lr0=lr0,
     exist_ok=True,
     patience=12,
     seed=0,
@@ -34,5 +37,6 @@ model.train(
     mosaic=1.0,
     close_mosaic=8,
 )
-metrics = model.val(data=data, split="test", imgsz=imgsz)
-print("TEST mAP50", metrics.box.map50, "mAP50-95", metrics.box.map, "P", metrics.box.mp, "R", metrics.box.mr)
+if os.environ.get("TEST_SPLIT", "1") == "1":
+    metrics = model.val(data=data, split="test", imgsz=imgsz)
+    print("TEST mAP50", metrics.box.map50, "mAP50-95", metrics.box.map, "P", metrics.box.mp, "R", metrics.box.mr)

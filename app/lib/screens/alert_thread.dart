@@ -6,6 +6,7 @@ import '../data/models.dart';
 import '../l10n.dart';
 import '../main.dart';
 import '../services/bridge.dart';
+import 'damage_report_screen.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/motion.dart';
@@ -398,7 +399,8 @@ class _AlertPhotoState extends State<_AlertPhoto> {
           }
           if (!snap.hasData) return const Skeleton(height: 200, radius: DL.rCard);
           final url = snap.data!;
-          return Pressable(
+          return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Pressable(
             child: GestureDetector(
               onTap: () => Navigator.of(context).push(PageRouteBuilder(
                 opaque: false,
@@ -435,7 +437,16 @@ class _AlertPhotoState extends State<_AlertPhoto> {
                 ),
               ),
             ),
-          );
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => push(context, DamageReportScreen(photoUrl: url)),
+                icon: const Icon(Icons.car_crash_outlined, size: 20),
+                label: Text(tr('Estimate damage')),
+              ),
+            ),
+          ]);
         },
       ),
     );

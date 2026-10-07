@@ -14,6 +14,7 @@ import 'fit_check.dart';
 import 'garage_log_screen.dart';
 import 'onboarding.dart';
 import 'parking_screen.dart';
+import 'damage_report_screen.dart';
 import 'plate_scan_screen.dart';
 import 'society_screen.dart';
 import 'tag_screen.dart';
@@ -119,6 +120,13 @@ class GarageTab extends StatelessWidget {
               title: tr('Reach a car by its plate'),
               subtitle: tr('Point the camera at any number plate; the reading happens on this phone'),
               onTap: () => push(context, const PlateScanScreen()),
+            ),
+            const Divider(),
+            _Row(
+              icon: Icons.car_crash_outlined,
+              title: tr('Check damage and cost'),
+              subtitle: tr('Photograph damage; the phone marks it and estimates a repair cost'),
+              onTap: () => push(context, const DamageReportScreen()),
             ),
             const Divider(),
             _Row(

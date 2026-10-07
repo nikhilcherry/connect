@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:connect/l10n.dart';
 import 'package:connect/services/bridge.dart';
+import 'package:connect/services/damage_cost.dart';
+import 'package:connect/services/damage_detector.dart';
 import 'package:connect/services/plate_detector.dart';
 import 'package:connect/services/plate_reader.dart';
 import 'package:connect/services/situation.dart';
@@ -35,6 +37,23 @@ void main() {
   });
 
   carPhoto();
+
+  // Our damage detector on a held-out validation photo (python reference on this photo:
+  // scratch 0.72, crack 0.45, scratch 0.33, crack 0.28). adb push /tmp/.../damage_sample.jpg /data/local/tmp/
+  testWidgets('our damage detector finds damage in a held-out photo', (t) async {
+    if (!File('/data/local/tmp/damage_sample.jpg').existsSync()) return;
+    final px = await Pixels.fromFile(await asset('damage_sample.jpg'));
+    final det = await DamageDetector.load();
+    final sw = Stopwatch()..start();
+    final found = await det.detect(px);
+    sw.stop();
+    final est = estimateRepairCost(found, make: 'Maruti Suzuki', lengthMm: 3860);
+    // ignore: avoid_print
+    print('DAMAGE ${px.width}x${px.height} ${sw.elapsedMilliseconds}ms found=${found.map((f) => '${f.type.wire}:${f.score.toStringAsFixed(2)}').toList()} estimate=Rs ${est.low}-${est.high}');
+    expect(found, isNotEmpty);
+    expect(found.first.type, DamageType.scratch);
+    expect(found.first.score, greaterThan(0.6));
+  });
   realWorldPlates();
 
   // Our own YOLO11n plate detector, run on the device with ONNX Runtime.

@@ -1,0 +1,17 @@
+train samples 418656, real test crops 150, steps 14000
+parameters 866437
+step 1000 loss 0.448 | synth exact 254/500 | REAL TEST exact 44/150 (29.3%) CER 0.216 | 47s
+step 2000 loss 0.182 | synth exact 393/500 | REAL TEST exact 87/150 (58.0%) CER 0.156 | 89s
+step 3000 loss 0.165 | synth exact 409/500 | REAL TEST exact 86/150 (57.3%) CER 0.142 | 131s
+step 4000 loss 0.115 | synth exact 410/500 | REAL TEST exact 87/150 (58.0%) CER 0.145 | 193s
+step 5000 loss 0.150 | synth exact 417/500 | REAL TEST exact 83/150 (55.3%) CER 0.140 | 249s
+step 6000 loss 0.111 | synth exact 427/500 | REAL TEST exact 93/150 (62.0%) CER 0.138 | 315s
+step 7000 loss 0.113 | synth exact 423/500 | REAL TEST exact 94/150 (62.7%) CER 0.130 | 381s
+step 8000 loss 0.117 | synth exact 427/500 | REAL TEST exact 92/150 (61.3%) CER 0.128 | 447s
+step 9000 loss 0.068 | synth exact 437/500 | REAL TEST exact 93/150 (62.0%) CER 0.136 | 510s
+step 10000 loss 0.084 | synth exact 434/500 | REAL TEST exact 94/150 (62.7%) CER 0.127 | 573s
+step 11000 loss 0.086 | synth exact 433/500 | REAL TEST exact 94/150 (62.7%) CER 0.125 | 636s
+step 12000 loss 0.102 | synth exact 435/500 | REAL TEST exact 90/150 (60.0%) CER 0.125 | 701s
+step 13000 loss 0.071 | synth exact 437/500 | REAL TEST exact 91/150 (60.7%) CER 0.124 | 767s
+step 14000 loss 0.065 | synth exact 440/500 | REAL TEST exact 91/150 (60.7%) CER 0.126 | 833s
+FINAL REAL TEST exact 91/150 (60.7%) CER 0.126

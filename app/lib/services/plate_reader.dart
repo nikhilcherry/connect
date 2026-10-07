@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 import 'plate_detector.dart';
+import 'plate_recognizer.dart';
 
 /// Pulls Indian number plates out of OCR text. Pure so it can be tested
 /// without a camera: the recogniser hands over messy lines, this keeps the
@@ -90,6 +91,9 @@ const _states = {
 };
 bool _validState(String code) => _states.contains(code);
 
+/// A plate in a format issued in India (standard or Bharat series, real state code).
+bool isValidPlate(String t) => (_std.hasMatch(t) && _validState(t.substring(0, 2))) || _bh.hasMatch(t);
+
 /// On-device OCR (Google ML Kit). The photo never leaves the phone; only the
 /// recognised plate text is sent, and only if the user confirms it.
 Future<List<String>> readPlates(File photo) async {
@@ -105,42 +109,58 @@ Future<List<String>> readPlates(File photo) async {
 
 /// What the pipeline found in a photo, best candidate first.
 class PlateReading {
-  const PlateReading(this.plates, this.boxes, {required this.usedDetector});
+  const PlateReading(this.plates, this.boxes, {required this.usedDetector, this.fromOurReader = const {}});
   final List<String> plates;
   final List<PlateBox> boxes;
 
   /// False when the detector found nothing and the whole photo was read instead.
   final bool usedDetector;
+
+  /// Which candidates came from our own reader (the rest are ML Kit's).
+  final Set<String> fromOurReader;
 }
 
-/// Our own detector finds the plate first, then the text reader reads only the
-/// crop. That is far more reliable on a busy street than reading the whole
-/// frame, and it works with several cars in view. Falls back to reading the
-/// whole photo when the detector finds nothing (or can't run).
+/// Our detector finds each plate, then our own reader and ML Kit both read the crop.
+/// On 150 held-out real Indian plates, "our reader if it gives a valid plate, otherwise
+/// ML Kit" got 98 right (65%), against 91 for our reader alone and 74 for ML Kit with the
+/// same repair rules (ml/README.md), so that is the rule. When the two disagree both are
+/// offered. Falls back to reading the whole photo when the detector finds nothing.
 Future<PlateReading> readPlatesInPhoto(File photo) async {
   List<PlateBox> boxes = const [];
   final plates = <String>[];
+  final ours = <String>{};
   try {
     final px = await Pixels.fromFile(photo);
     boxes = await (await PlateDetector.load()).detect(px);
     final dir = await getTemporaryDirectory();
+    PlateRecognizer? reader;
+    try {
+      reader = await PlateRecognizer.load();
+    } catch (_) {
+      reader = null; // no model for this CPU: ML Kit alone
+    }
     final recogniser = TextRecognizer(script: TextRecognitionScript.latin);
     try {
       for (var i = 0; i < boxes.length && i < 4; i++) {
+        final mine = reader?.readBox(px, boxes[i]).text ?? '';
         final crop = File('${dir.path}/plate_crop_$i.png');
         await crop.writeAsBytes(await px.cropPng(boxes[i]));
-        final text = (await recogniser.processImage(InputImage.fromFile(crop))).text;
-        for (final p in extractPlates(text)) {
+        final theirs = extractPlates((await recogniser.processImage(InputImage.fromFile(crop))).text);
+        final order = [
+          if (isValidPlate(mine)) mine,
+          ...theirs,
+        ];
+        for (final p in order) {
           if (!plates.contains(p)) plates.add(p);
+          if (p == mine) ours.add(p);
         }
       }
     } finally {
       await recogniser.close();
     }
   } catch (e) {
-    // No native library for this CPU, a bad file: fall through to the whole photo.
     boxes = const [];
   }
-  if (plates.isNotEmpty) return PlateReading(plates, boxes, usedDetector: true);
+  if (plates.isNotEmpty) return PlateReading(plates, boxes, usedDetector: true, fromOurReader: ours);
   return PlateReading(await readPlates(photo), boxes, usedDetector: false);
 }
