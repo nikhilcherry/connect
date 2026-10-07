@@ -24,6 +24,9 @@ class AppState extends ChangeNotifier {
   /// fault sends people checking their Wi-Fi for nothing.
   bool loadErrorIsNetwork = false;
   Vehicle? vehicle;
+
+  /// Every car this user owns or shares; [vehicle] is the one on screen.
+  List<Vehicle> vehicles = [];
   Tag? tag;
   List<CarAlert> alerts = [];
   List<EmergencyContact> contacts = [];
@@ -106,8 +109,10 @@ class AppState extends ChangeNotifier {
 
   Future<void> refresh() async {
     // RLS returns cars the user owns and cars shared with them; show their own first.
-    final vehicles = (await _db.from('vehicles').select().order('created_at', ascending: true)).map(Vehicle.fromJson).toList();
-    vehicle = vehicles.where((v) => v.owner == userId).firstOrNull ?? vehicles.firstOrNull;
+    vehicles = (await _db.from('vehicles').select().order('created_at', ascending: true)).map(Vehicle.fromJson).toList();
+    final prefs = await SharedPreferences.getInstance();
+    final chosen = vehicles.where((v) => v.id == prefs.getString(_activeKey)).firstOrNull;
+    vehicle = chosen ?? vehicles.where((v) => v.owner == userId).firstOrNull ?? vehicles.firstOrNull;
     if (vehicle != null) {
       final tags = await _db.from('tags').select().eq('vehicle_id', vehicle!.id).order('created_at', ascending: false).limit(1);
       tag = tags.isEmpty ? null : Tag.fromJson(tags.first);
@@ -225,6 +230,27 @@ class AppState extends ChangeNotifier {
   }
 
   // ---------------------------------------------------------------- vehicle + tag
+
+  static const _activeKey = 'active_vehicle';
+
+  /// Switches the car on screen. Alerts stay account-wide; the tag, "back by"
+  /// status and renewals follow the selected car.
+  Future<void> selectVehicle(String id) async {
+    if (vehicle?.id == id) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_activeKey, id);
+    await refresh();
+  }
+
+  /// Adds another car (and its tag) and makes it the active one.
+  Future<void> addVehicle(Map<String, dynamic> fields) async {
+    final row = await _db.from('vehicles').insert(fields).select().single();
+    final v = Vehicle.fromJson(row);
+    await _db.from('tags').insert({'vehicle_id': v.id});
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_activeKey, v.id);
+    await refresh();
+  }
 
   Future<void> saveVehicle(Map<String, dynamic> fields) async {
     if (vehicle == null) {

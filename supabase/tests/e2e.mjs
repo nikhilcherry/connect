@@ -373,6 +373,19 @@ const dead = await scan({ action: "lookup", code }, ip);
 check(dead.status === 404, "deactivated tag stops working", dead);
 
 
+// --- more than one car per account
+{
+  const multi = await signIn();
+  const a = await rest(multi, "POST", "vehicles", { reg_number: `KA05AA${Math.floor(1000 + Math.random() * 9000)}`, make: "Hyundai", model: "i20" });
+  const b = await rest(multi, "POST", "vehicles", { reg_number: `KA05BB${Math.floor(1000 + Math.random() * 9000)}`, make: "Kia", model: "Seltos" });
+  check(a.status === 201 && b.status === 201, "one account can own two cars", [a, b]);
+  const ta = await rest(multi, "POST", "tags", { vehicle_id: a.data[0].id });
+  const tb = await rest(multi, "POST", "tags", { vehicle_id: b.data[0].id });
+  check(ta.status === 201 && tb.status === 201 && ta.data[0].code !== tb.data[0].code, "each car gets its own tag", [ta, tb]);
+  const mine = await rest(multi, "GET", "vehicles?select=id");
+  check(mine.data.length === 2, "owner sees both cars", mine);
+}
+
 // --- account deletion
 {
   const goner = await signIn();

@@ -32,6 +32,17 @@ class GarageTab extends StatelessWidget {
       child: ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 32), children: revealAll([
         ScreenTitle(tr('Garage'), eyebrow: tr('Your car')),
         const SizedBox(height: 24),
+        if (s.vehicles.length > 1) ...[
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            for (final c in s.vehicles)
+              ChoiceChip(
+                label: Text(c.title),
+                selected: c.id == v.id,
+                onSelected: (_) => s.selectVehicle(c.id),
+              ),
+          ]),
+          const SizedBox(height: 16),
+        ],
         SectionCard(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
@@ -60,6 +71,16 @@ class GarageTab extends StatelessWidget {
           ]),
         ),
         const SizedBox(height: 32),
+        if (s.isOwner)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => push(context, const VehicleFormScreen(addAnother: true)),
+              icon: const Icon(Icons.add),
+              label: Text(tr('Add another car')),
+            ),
+          ),
+        const SizedBox(height: 16),
         Label(tr('Running the car')),
         const SizedBox(height: 12),
         Card(

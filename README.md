@@ -9,7 +9,7 @@ A QR tag on the windshield turns "whose car is this?" into a private two-way cha
 | **Platform** | Android (Flutter) + static web scan page + Supabase backend |
 | **Running cost** | ₹0 / month on free tiers |
 | **Languages** | English, हिन्दी, ಕನ್ನಡ, தமிழ் (app, scan page and trip page) |
-| **Tests** | 116 backend end-to-end checks · 49 app tests |
+| **Tests** | 119 backend end-to-end checks · 49 app tests |
 
 ---
 
@@ -153,7 +153,7 @@ Push is optional: create a Firebase project with Android app `app.connectcar.con
 - **SOS opens the SMS app pre-filled** and can't send silently: Play only grants SEND_SMS to default SMS apps.
 - **Crash detection runs only while Drive Mode is on screen** (4 g threshold, 15 s countdown, not validated against real crashes).
 - **Accounts live on one phone**: reinstalling loses the car.
-- **One vehicle per account** in the UI (the schema supports many).
+- Several cars per account: switch from the chips at the top of Garage. Alerts are account-wide, and local logs (parking, fuel, documents) are shared across cars.
 - **Translations** have not had a native-speaker review.
 - Car dimensions are typical figures for 39 popular models, shown as editable estimates.
 - Account deletion (Garage → Delete my account) and a privacy page (`web/privacy.html`, served at `/privacy`) exist.

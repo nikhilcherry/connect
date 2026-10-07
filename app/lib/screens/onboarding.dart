@@ -120,8 +120,11 @@ const _colours = [/*t*/'White', /*t*/'Silver', /*t*/'Grey', /*t*/'Black', /*t*/'
 
 /// Add (from onboarding) or edit (from Garage) the owner's vehicle.
 class VehicleFormScreen extends StatefulWidget {
-  const VehicleFormScreen({super.key, this.existing});
+  const VehicleFormScreen({super.key, this.existing, this.addAnother = false});
   final Vehicle? existing;
+
+  /// Adds a further car to an account that already has one.
+  final bool addAnother;
 
   @override
   State<VehicleFormScreen> createState() => _VehicleFormScreenState();
@@ -161,7 +164,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     final model = _manual ? _model.text.trim() : _spec!.model;
     final spec = carCatalog.where((c) => c.make == make && c.model == model).firstOrNull;
     try {
-      await s.saveVehicle({
+      final fields = {
         'reg_number': _normaliseReg(_reg.text),
         'make': make,
         'model': model,
@@ -170,9 +173,14 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
         'length_mm': spec?.lengthMm ?? widget.existing?.lengthMm,
         'width_mm': spec?.widthMm ?? widget.existing?.widthMm,
         'height_mm': spec?.heightMm ?? widget.existing?.heightMm,
-      });
+      };
+      if (widget.addAnother) {
+        await s.addVehicle(fields);
+      } else {
+        await s.saveVehicle(fields);
+      }
       if (!mounted) return;
-      if (_editing) {
+      if (_editing || widget.addAnother) {
         Navigator.of(context).pop();
       } else {
         await Notifications.requestPermission();
@@ -198,7 +206,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_editing ? tr('Edit car') : tr('Your car'))),
+      appBar: AppBar(title: Text(_editing ? tr('Edit car') : widget.addAnother ? tr('Add another car') : tr('Your car'))),
       body: SafeArea(
         child: Form(
           key: _form,
