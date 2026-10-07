@@ -8,6 +8,8 @@ import '../config.dart';
 import '../l10n.dart';
 import '../main.dart';
 import '../services/plate_reader.dart';
+import '../services/damage_detector.dart';
+import '../services/plate_detector.dart';
 import '../services/situation.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -117,8 +119,17 @@ class _PlateScanScreenState extends State<PlateScanScreen> {
     setState(() => _analysing = true);
     Situation? s;
     try {
-      s = await readSituation(File(shot.path));
+      // Our damage detector first: if it sees damage, say what. Otherwise the scene labeller.
+      final px = await Pixels.fromFile(File(shot.path), maxSide: 1600);
+      final found = await (await DamageDetector.load()).detect(px);
+      s = situationFromDamage(found,
+          label: (t) => tr(t.label), draft: (what) => tr('I can see damage on your car: {what}.', {'what': what}));
     } catch (_) {}
+    if (s == null) {
+      try {
+        s = await readSituation(File(shot.path));
+      } catch (_) {}
+    }
     if (mounted) {
       setState(() {
         _situation = s;

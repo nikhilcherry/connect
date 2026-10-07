@@ -172,6 +172,7 @@
  "Helps people confirm they found the right car.": "लोगों को सही गाड़ी पहचानने में मदद करता है।",
  "Home": "होम",
  "How to print": "कैसे प्रिंट करें",
+ "I can see damage on your car: {what}.": "आपकी गाड़ी पर नुकसान दिख रहा है: {what}।",
  "I put a Connect tag on my car: if it's blocking someone or the lights are on, they can message me without seeing my number. It's free: {url}": "मैंने अपनी गाड़ी पर Connect टैग लगाया है: अगर वह किसी का रास्ता रोक रही हो या लाइट जल रही हो, तो लोग मेरा नंबर देखे बिना मुझे संदेश भेज सकते हैं। यह मुफ़्त है: {url}",
  "I'm OK, cancel": "मैं ठीक हूँ, रद्द करें",
  "I'm back": "मैं लौट आया",

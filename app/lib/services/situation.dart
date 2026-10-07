@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
 
+import 'damage_cost.dart';
+
 enum Urgency { normal, high }
 
 /// What the phone made of a photo: a reason for the alert, a drafted
@@ -61,4 +63,21 @@ Future<Situation?> readSituation(File photo) async {
   } finally {
     await labeler.close();
   }
+}
+
+
+/// A report built from what the damage detector found in the photo, or null if it saw
+/// nothing it is confident about. Only the four reliable classes count (the model saw
+/// almost no broken lamps or flat tyres). The text is a draft the sender can change.
+Situation? situationFromDamage(List<DamageFinding> found, {double minScore = 0.4, required String Function(DamageType) label, required String Function(String what) draft}) {
+  const reliable = {DamageType.scratch, DamageType.dent, DamageType.crack, DamageType.glassShatter};
+  final f = found.where((x) => x.score >= minScore && reliable.contains(x.type)).toList();
+  if (f.isEmpty) return null;
+  final counts = <DamageType, int>{};
+  for (final x in f) {
+    counts[x.type] = (counts[x.type] ?? 0) + 1;
+  }
+  final what = counts.entries.map((e) => e.value > 1 ? '${label(e.key).toLowerCase()} x${e.value}' : label(e.key).toLowerCase()).join(', ');
+  final urgent = counts.containsKey(DamageType.glassShatter);
+  return Situation('accident', draft(what), urgent ? Urgency.high : Urgency.normal);
 }

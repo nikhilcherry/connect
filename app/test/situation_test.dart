@@ -1,3 +1,4 @@
+import 'package:connect/services/damage_cost.dart';
 import 'package:connect/services/situation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -32,5 +33,28 @@ void main() {
     expect(interpretLabels({'Wreck': 0.3}), isNull);
     expect(interpretLabels({'Cat': 0.99}), isNull);
     expect(interpretLabels({}), isNull);
+  });
+
+  group('situationFromDamage', () {
+    DamageFinding f(DamageType t, double score) => DamageFinding(t, score, 0.1, 0.1, 0.3, 0.3);
+    String label(DamageType t) => t.label;
+    String draft(String w) => 'I can see damage on your car: $w.';
+
+    test('names what it found, counted, as an accident or damage report', () {
+      final s = situationFromDamage([f(DamageType.scratch, 0.8), f(DamageType.scratch, 0.6), f(DamageType.dent, 0.5)], label: label, draft: draft)!;
+      expect(s.kind, 'accident');
+      expect(s.note, 'I can see damage on your car: scratch x2, dent.');
+      expect(s.urgency, Urgency.normal);
+    });
+
+    test('shattered glass is urgent', () {
+      expect(situationFromDamage([f(DamageType.glassShatter, 0.7)], label: label, draft: draft)!.urgency, Urgency.high);
+    });
+
+    test('low-confidence findings and the unreliable classes are ignored', () {
+      expect(situationFromDamage([f(DamageType.dent, 0.2)], label: label, draft: draft), isNull);
+      expect(situationFromDamage([f(DamageType.lampBroken, 0.9), f(DamageType.tireFlat, 0.9)], label: label, draft: draft), isNull);
+      expect(situationFromDamage(const [], label: label, draft: draft), isNull);
+    });
   });
 }
