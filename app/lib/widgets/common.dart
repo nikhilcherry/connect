@@ -154,7 +154,7 @@ class StatCard extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             AnimatedFigure(value, style: DLText.numeral.copyWith(color: inverted ? DL.onDark : (live ? DL.violet : DL.ink))),
             const SizedBox(height: 8),
-            Text(label, maxLines: 2, style: DLText.small.copyWith(color: inverted ? DL.onDarkMuted : DL.muted)),
+            Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: DLText.small.copyWith(color: inverted ? DL.onDarkMuted : DL.muted)),
           ]),
         ),
       ),
