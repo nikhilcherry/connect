@@ -132,14 +132,19 @@ class PlateReading {
   final Set<String> fromOurReader;
 }
 
-/// Our detector finds each plate, then our own reader and ML Kit both read the crop.
-/// On 150 held-out real Indian plates, "our reader if it gives a valid plate, otherwise
-/// ML Kit" got 98 right (65%), against 91 for our reader alone and 74 for ML Kit with the
-/// same repair rules (ml/README.md), so that is the rule. When the two disagree both are
-/// offered. Falls back to reading the whole photo when the detector finds nothing.
+/// Reads the plate(s) in a photo from three sources and merges them: our detector finds each
+/// plate and then our own reader and ML Kit read the crop; ML Kit also reads the whole photo.
+///
+/// Order of the candidates: those that the crop reading and the whole-photo reading AGREE on
+/// first (agreement is a strong signal), then the whole-photo reading, then the crop reads.
+/// Measured on 44 real Indian phone photos (46 plates, labelled by hand, never trained on):
+/// the old whole-photo ML Kit read found 22 plates with the right one first on 21 photos; this
+/// finds 28 with the right one first on 25. Crop reads alone found 26 and were first on only 19:
+/// good phone photos have big, clear plates where the whole-photo read is strong, and our
+/// reader earns its place on small plates and busy scenes. (ml/README.md)
 Future<PlateReading> readPlatesInPhoto(File photo) async {
   List<PlateBox> boxes = const [];
-  final plates = <String>[];
+  final crops = <String>[];
   final ours = <String>{};
   try {
     final px = await Pixels.fromFile(photo);
@@ -158,12 +163,9 @@ Future<PlateReading> readPlatesInPhoto(File photo) async {
         final crop = File('${dir.path}/plate_crop_$i.png');
         await crop.writeAsBytes(await px.cropPng(boxes[i]));
         final theirs = extractPlates((await recogniser.processImage(InputImage.fromFile(crop))).text);
-        final order = [
-          if (isValidPlate(mine)) mine,
-          ...theirs,
-        ];
-        for (final p in order) {
-          if (!plates.contains(p)) plates.add(p);
+        // our reader's answer first when it is a valid plate, then ML Kit's read of the crop
+        for (final p in [if (isValidPlate(mine)) mine, ...theirs]) {
+          if (!crops.contains(p)) crops.add(p);
           if (p == mine) ours.add(p);
         }
       }
@@ -173,6 +175,12 @@ Future<PlateReading> readPlatesInPhoto(File photo) async {
   } catch (e) {
     boxes = const [];
   }
-  if (plates.isNotEmpty) return PlateReading(plates, boxes, usedDetector: true, fromOurReader: ours);
-  return PlateReading(await readPlates(photo), boxes, usedDetector: false);
+  final whole = await readPlates(photo);
+  final both = crops.where(whole.contains).toList();
+  final merged = [
+    ...both,
+    ...whole.where((p) => !both.contains(p)),
+    ...crops.where((p) => !both.contains(p) && !whole.contains(p)),
+  ];
+  return PlateReading(merged, boxes, usedDetector: crops.isNotEmpty, fromOurReader: ours);
 }

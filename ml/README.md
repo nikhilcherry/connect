@@ -85,6 +85,26 @@ Limits: 150 plates is a small test; the real training crops come from a dataset 
 licence is unspecified (research use, not redistributed, none of its pixels committed);
 fonts are system fonts, not the real HSRP typeface.
 
+### End to end on real photos (the whole product path)
+
+Crops are the easy case. The real question: photo in, plate text out. We labelled **46 plates in
+44 full-resolution Indian phone photos** of the Datacluster evaluation sample by reading each crop
+ourselves (6 more were hidden or incomplete and excluded; labels are ours, not the vendor's, and
+kept out of the repo). Run on the Android 15 emulator (`app/integration_test/e2e_photos_test.dart`):
+
+| Way of reading the photo | Plates found (of 46) | Right plate listed first (of 44 photos) |
+| --- | --- | --- |
+| ML Kit on the whole photo (the old way) | 22 (48%) | 21 (48%) |
+| Our detector, then our reader + ML Kit on each crop | 26 (57%) | 19 (43%) |
+| **What the app does: agreement first, then ML Kit whole photo, then crop reads** | **28 (61%)** | **25 (57%)** |
+
+Honest reading: crop reads alone found more plates but were *first* less often. Phone photos
+with big clear plates are where whole-photo ML Kit is strong; our reader earns its place on
+small plates and busy scenes. Merging gives the best of both. The ordering was chosen on these
+same 44 photos (among a few simple variants, all listed above and in the test history), so treat
+57% as optimistic by a few points. Cost: about 1.3 s a photo on an x86 emulator (ML Kit runs
+twice), a proxy for a phone.
+
 ## 3. Damage detector (YOLO11n, 6 classes, 512 px)
 
 Trained on [`tugberkkalay/autodamageiq-vehicle-damage-dataset`](https://huggingface.co/datasets/tugberkkalay/autodamageiq-vehicle-damage-dataset)
