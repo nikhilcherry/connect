@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../l10n.dart';
@@ -38,6 +39,19 @@ class AppState extends ChangeNotifier {
   bool get isOwner => vehicle == null || vehicle!.owner == userId;
 
   int get openAlerts => alerts.where((a) => a.status != AlertStatus.resolved && !a.blocked).length;
+
+  /// Deletes this account and everything server-side tied to it, wipes what
+  /// this phone keeps (parking, fuel log, documents, settings), then starts
+  /// fresh as a new anonymous user.
+  Future<void> deleteAccount() async {
+    await _db.rpc('delete_my_account');
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    await _db.auth.signOut(scope: SignOutScope.local);
+    vehicle = null;
+    alerts = [];
+    await bootstrap();
+  }
 
   Future<void> bootstrap() async {
     loading = true;

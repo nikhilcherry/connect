@@ -9,7 +9,7 @@ A QR tag on the windshield turns "whose car is this?" into a private two-way cha
 | **Platform** | Android (Flutter) + static web scan page + Supabase backend |
 | **Running cost** | ₹0 / month on free tiers |
 | **Languages** | English, हिन्दी, ಕನ್ನಡ, தமிழ் (app, scan page and trip page) |
-| **Tests** | 112 backend end-to-end checks · 48 app tests |
+| **Tests** | 115 backend end-to-end checks · 48 app tests |
 
 ---
 
@@ -156,4 +156,4 @@ Push is optional: create a Firebase project with Android app `app.connectcar.con
 - **One vehicle per account** in the UI (the schema supports many).
 - **Translations** have not had a native-speaker review.
 - Car dimensions are typical figures for 39 popular models, shown as editable estimates.
-- No real app icon yet (Flutter's default), no account deletion, no privacy policy page.
+- No real app icon yet (Flutter's default). Account deletion (Garage → Delete my account) and a privacy page (`web/privacy.html`, served at `/privacy`) exist; the contact line on the privacy page still needs a real address.

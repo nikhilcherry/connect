@@ -363,4 +363,18 @@ await rest(owner, "PATCH", `tags?code=eq.${code}`, { active: false });
 const dead = await scan({ action: "lookup", code }, ip);
 check(dead.status === 404, "deactivated tag stops working", dead);
 
+
+// --- account deletion
+{
+  const goner = await signIn();
+  const gv = await rest(goner, "POST", "vehicles", { reg_number: `KA09ZZ${Math.floor(1000 + Math.random() * 9000)}`, make: "Tata", model: "Nexon" });
+  const gt = await rest(goner, "POST", "tags", { vehicle_id: gv.data[0].id });
+  const del = await rest(goner, "POST", "rpc/delete_my_account", {});
+  check(del.status < 300, "owner can delete their account", del);
+  const after = await scan({ action: "lookup", code: gt.data[0].code }, "10.9.1.1");
+  check(after.status === 404, "deleted account's tag stops resolving", after);
+  const anonDel = await fetch(`${URL_}/rest/v1/rpc/delete_my_account`, { method: "POST", headers: { apikey: ANON, "Content-Type": "application/json" }, body: "{}" });
+  check(anonDel.status >= 400, "anon key cannot call delete_my_account", anonDel.status);
+}
+
 console.log(`\n${passed} checks passed`);

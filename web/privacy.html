@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy · Connect</title>
+<meta name="description" content="What Connect collects, what it never shows, and how to delete it.">
+<style>
+  :root { --ground:#EEEDF8; --card:#fff; --line:#DAD7EC; --ink:#171335; --muted:#575279; --violet:#5A45C9; color-scheme: light; }
+  body { margin:0; background:var(--ground); color:var(--ink); font:16px/1.6 Manrope, system-ui, sans-serif; }
+  main { max-width:680px; margin:0 auto; padding:32px 16px 64px; }
+  h1 { font:700 30px/1.2 "Space Grotesk", system-ui, sans-serif; margin:0 0 4px; }
+  h2 { font:700 18px "Space Grotesk", system-ui, sans-serif; margin:32px 0 6px; }
+  p, li { color:var(--muted); } ul { padding-left:20px; }
+  a { color:var(--violet); }
+  .card { background:var(--card); border:1px solid var(--line); padding:4px 20px 20px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Privacy</h1>
+  <p>Connect lets people reach a car's owner without either side sharing a phone number. Here is everything it handles.</p>
+  <div class="card">
+    <h2>What we keep</h2>
+    <ul>
+      <li><b>Your car:</b> number plate, make, model, colour, optional renewal dates. Stored on our servers so the scan page can work.</li>
+      <li><b>Alerts and messages</b> between a stranger and you, with an optional photo. Photos are deleted after 7 days.</li>
+      <li><b>Optional, only if you add them:</b> medical info, family members, housing society, push token, live trip position (only while a trip is on).</li>
+      <li><b>A salted hash of a sender's network address</b>, to rate-limit abuse and let you block someone. It cannot be turned back into an address.</li>
+    </ul>
+    <h2>What stays on your phone</h2>
+    <p>Where you parked, fuel and expense log, document photos and service history. These never reach our servers.</p>
+    <h2>What a stranger can see</h2>
+    <p>Your car's colour, make and model. After they type the last 4 characters of the plate, the messages in their own thread, your "back by" status, and, on an accident report only, the medical info you chose to share. They never see your name, number, address or full plate.</p>
+    <h2>On-device AI</h2>
+    <p>Reading a number plate from a camera photo, suggesting what is wrong from a photo of the problem, translating messages and voice typing all run on your phone. Those photos are not uploaded. Translation language packs download once from Google.</p>
+    <h2>Delete it</h2>
+    <p>In the app: Garage, then <b>Delete my account</b>. This removes your car, tags, alerts, family links, trips and push tokens from our servers and clears everything stored on the phone. Printed stickers stop working.</p>
+    <h2>We don't</h2>
+    <ul><li>sell or share data, show ads, or ask for your phone number or an email address.</li></ul>
+  </div>
+</main>
+</body>
+</html>

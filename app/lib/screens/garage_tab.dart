@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'plate_scan_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -15,6 +14,7 @@ import 'fit_check.dart';
 import 'garage_log_screen.dart';
 import 'onboarding.dart';
 import 'parking_screen.dart';
+import 'plate_scan_screen.dart';
 import 'society_screen.dart';
 import 'tag_screen.dart';
 import 'wallet_screen.dart';
@@ -176,8 +176,36 @@ class GarageTab extends StatelessWidget {
           tr('People who scan your tag see only your car\'s colour, make and model. Messages go through Connect, so no one sees a phone number. Your account lives on this phone: if you reinstall the app you\'ll need to set up your car again.'),
           style: DLText.body.copyWith(color: DL.muted),
         ),
+        const SizedBox(height: 12),
+        TextButton.icon(
+          style: TextButton.styleFrom(foregroundColor: DL.error),
+          onPressed: () => _confirmDelete(context),
+          icon: const Icon(Icons.delete_outline),
+          label: Text(tr('Delete my account')),
+        ),
       ])),
     );
+  }
+}
+
+Future<void> _confirmDelete(BuildContext context) async {
+  final s = AppScope.read(context);
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (c) => AlertDialog(
+      title: Text(tr('Delete your account?')),
+      content: Text(tr('This removes your car, tag, alerts, family links and everything saved on this phone. Printed stickers will stop working. It can\'t be undone.')),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(c, false), child: Text(tr('Cancel'))),
+        TextButton(style: TextButton.styleFrom(foregroundColor: DL.error), onPressed: () => Navigator.pop(c, true), child: Text(tr('Delete everything'))),
+      ],
+    ),
+  );
+  if (ok != true) return;
+  try {
+    await s.deleteAccount();
+  } catch (e) {
+    if (context.mounted) showError(context, e);
   }
 }
 
