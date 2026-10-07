@@ -68,6 +68,20 @@ quantize_static(pre, out, Reader(files, name), quant_format=QuantFormat.QDQ, per
                 activation_type=QuantType.QUInt8, weight_type=QuantType.QInt8, nodes_to_exclude=exclude)
 os.remove(pre)
 
+# The phone runs ONNX Runtime 1.15, which only accepts released opset versions. The newer
+# onnxruntime/onnx used by this script also stamps the model with extra operator domains
+# (ai.onnx.ml v5, ai.onnx.training, com.microsoft.nchwc ...) that 1.15 rejects with
+# "only guarantees support for released opsets". No node uses them, so keep only the
+# standard domain. (Desktop runtimes accept either, so an on-device test is the real check.)
+final = onnx.load(out)
+used = {(n.domain or "ai.onnx") for n in final.graph.node}
+assert used <= {"ai.onnx"}, f"model uses non-standard domains: {used}"
+keep = [o for o in final.opset_import if o.domain in ("", "ai.onnx")]
+del final.opset_import[:]
+final.opset_import.extend(keep)
+final.ir_version = 8
+onnx.save(final, out)
+
 
 def bench(path, runs=60):
     so = ort.SessionOptions()

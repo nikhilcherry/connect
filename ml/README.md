@@ -136,6 +136,19 @@ $PY export_reader.py weights/plate_reader.pt ../app/assets/models/plate_reader.o
 
 Raw training curves and logs are in `results/`; weights in `weights/` (small `.pt` files).
 
+## Gotchas we hit
+
+- **A model that loads on the laptop can be rejected on the phone.** The phone's ONNX Runtime
+  is 1.15.1; the newer desktop `onnx` / `onnxruntime` used for quantisation stamps extra
+  operator domains (`ai.onnx.ml` v5, `ai.onnx.training`, `com.microsoft.nchwc` ...) that 1.15
+  refuses. It showed up as "the camera isn't available" in the live view, and only a run on the
+  device logged the real error. `compress_detector.py` and `fix_opset.py` now strip those
+  domains (checking no node uses them), and `app/test/shipped_models_test.dart` reads the header
+  of every shipped model in CI, so it cannot ship silently again.
+- **Naive INT8 breaks a YOLO head** (see Compression).
+- The training machine has little free RAM: pre-generate data (`gen_ocr_data.py`) instead of
+  loading PyTorch in many data-loader workers.
+
 ## Emulator notes
 
 `onnxruntime` 1.4.1 ships only ARM libraries. To test on an x86_64 emulator, extract
