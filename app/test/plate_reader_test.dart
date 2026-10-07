@@ -17,7 +17,10 @@ void main() {
   test('repairs O/0 and I/1 confusions by position', () {
     expect(extractPlates('KAO1AB123Q'), contains('KA01AB1230'));
     expect(extractPlates('MH12DE1433'), contains('MH12DE1433'));
-    expect(extractPlates('DL1CAB1234'), isNot(contains('DL1CAB1234')));
+    // older Delhi-style plates (district number + letter) are real plates too
+    expect(extractPlates('DL3C AB 1234'), contains('DL3CAB1234'));
+    expect(extractPlates('DL 8S BT 6438'), contains('DL8SBT6438'));
+    expect(extractPlates('DL3CD.1210'), contains('DL3CD1210'));
   });
 
   test('finds a plate inside surrounding text', () {

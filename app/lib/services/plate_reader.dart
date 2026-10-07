@@ -49,9 +49,13 @@ const _toLetter = {'0': 'O', '1': 'I', '2': 'Z', '5': 'S', '8': 'B', '6': 'G'};
 
 final _std = RegExp(r'^[A-Z]{2}\d{2}[A-Z]{1,3}\d{4}$');
 final _bh = RegExp(r'^\d{2}BH\d{4}[A-Z]{2}$');
+final _old = RegExp(r'^[A-Z]{2}\d[A-Z]{1,3}\d{4}$');
 
 /// Fixes letters read as digits (and the reverse) by position, then accepts
 /// the string only if it is plate-shaped. Null when it can't be one.
+///
+/// Two layouts: KA01AB1234 (state, 2-digit district, 1-3 series letters, 4 digits) and the
+/// older Delhi-style DL3CAB1234 (state, 1-digit district, then letters, 4 digits).
 String? _repair(String raw) {
   String digit(String c) => _toDigit[c] ?? c;
   String letter(String c) => _toLetter[c] ?? c;
@@ -63,25 +67,33 @@ String? _repair(String raw) {
     if (_bh.hasMatch(b)) return b;
   }
 
-  // Standard: LL dd L{1,3} dddd. Series length is whatever is left in the middle.
-  final seriesLen = raw.length - 8;
-  if (seriesLen < 1 || seriesLen > 3) return null;
-  final out = [
-    letter(c[0]),
-    letter(c[1]),
-    digit(c[2]),
-    digit(c[3]),
-    for (var i = 4; i < 4 + seriesLen; i++) letter(c[i]),
-    for (var i = 4 + seriesLen; i < raw.length; i++) digit(c[i]),
-  ].join();
-  if (!_std.hasMatch(out) || !_validState(out.substring(0, 2))) return null;
-  // Real OCR slips change a character or two; more than that is just text
-  // that happens to fit the pattern ("ORLD12345").
-  var changed = 0;
-  for (var i = 0; i < raw.length; i++) {
-    if (raw[i] != out[i]) changed++;
+  ({String text, int changed})? tryLayout(int districtDigits) {
+    final seriesLen = raw.length - 6 - districtDigits;
+    if (seriesLen < 1 || seriesLen > 3) return null;
+    final out = [
+      letter(c[0]),
+      letter(c[1]),
+      for (var i = 0; i < districtDigits; i++) digit(c[2 + i]),
+      for (var i = 2 + districtDigits; i < 2 + districtDigits + seriesLen; i++) letter(c[i]),
+      for (var i = 2 + districtDigits + seriesLen; i < raw.length; i++) digit(c[i]),
+    ].join();
+    final ok = (districtDigits == 2 ? _std : _old).hasMatch(out) && _validState(out.substring(0, 2));
+    if (!ok) return null;
+    var changed = 0;
+    for (var i = 0; i < raw.length; i++) {
+      if (raw[i] != out[i]) changed++;
+    }
+    // Real OCR slips change a character or two; more than that is just text that happens
+    // to fit the pattern ("ORLD12345"). The older layout is looser, so it gets none: only exact matches.
+    return changed <= (districtDigits == 2 ? 2 : 0) ? (text: out, changed: changed) : null;
   }
-  return changed <= 2 ? out : null;
+
+  // Both layouts can fit a string ("DL8SBT6438" is DL 8S BT 6438, or DL 85 BT 6438 after
+  // turning S into 5): take the one that needs fewer repairs; on a tie, the common one.
+  final a = tryLayout(2), b = tryLayout(1);
+  if (a == null) return b?.text;
+  if (b == null) return a.text;
+  return b.changed < a.changed ? b.text : a.text;
 }
 
 const _states = {
@@ -92,7 +104,7 @@ const _states = {
 bool _validState(String code) => _states.contains(code);
 
 /// A plate in a format issued in India (standard or Bharat series, real state code).
-bool isValidPlate(String t) => (_std.hasMatch(t) && _validState(t.substring(0, 2))) || _bh.hasMatch(t);
+bool isValidPlate(String t) => ((_std.hasMatch(t) || _old.hasMatch(t)) && _validState(t.substring(0, 2))) || _bh.hasMatch(t);
 
 /// On-device OCR (Google ML Kit). The photo never leaves the phone; only the
 /// recognised plate text is sent, and only if the user confirms it.
