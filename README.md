@@ -9,7 +9,7 @@ A QR tag on the windshield turns "whose car is this?" into a private two-way cha
 | **Platform** | Android (Flutter) + static web scan page + Supabase backend |
 | **Running cost** | ₹0 / month on free tiers |
 | **Languages** | English, हिन्दी, ಕನ್ನಡ, தமிழ் (app, scan page and trip page) |
-| **Tests** | 115 backend end-to-end checks · 49 app tests |
+| **Tests** | 116 backend end-to-end checks · 49 app tests |
 
 ---
 
@@ -81,7 +81,7 @@ owner's app ◄─────────────────────�
 
 Built for phone-first use, with audio and images processed on the device:
 
-1. **The plate is the QR. (Built.)** Garage → *Reach a car by its plate*: on-device OCR (ML Kit) reads a number plate, and if the owner is on Connect it opens the masked chat, so no sticker is needed. The photo never leaves the phone; the `plate` action only returns a tag code, shares the wrong-guess rate limit with plate checks, and is covered by the e2e suite.
+1. **The plate is the QR. (Built.)** Garage → *Reach a car by its plate*: on-device OCR (ML Kit) reads a number plate, and if the owner is on Connect it opens the masked chat, so no sticker is needed. The photo never leaves the phone; the `plate` action only returns a tag code (and nothing when a plate is claimed by more than one account, so a squatter never receives your messages), shares the wrong-guess rate limit with plate checks, and is covered by the e2e suite.
 2. **Situation understanding. (Built.)** After finding a car by plate, a photo of the problem is labelled on-device (ML Kit), which suggests the reason and drafts a message with an urgency flag. The suggestion rides to the scan page in the URL fragment (never sent to a server) and the sender still reviews and sends it.
 3. **Language bridge. (Built.)** In an alert thread, a stranger's message has a *Translate* action: the language is detected and translated into the app's language by ML Kit models on the phone (a ~30 MB pack per language downloads once). The owner can also dictate a reply with the phone's speech recogniser. Voice notes from the *stranger* are not handled, since the scan page has no on-device model.
 

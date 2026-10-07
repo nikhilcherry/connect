@@ -86,6 +86,15 @@ const byPlate = await scan({ action: "plate", plate: plate.toLowerCase().replace
 check(byPlate.status === 200 && byPlate.data.code === code && Object.keys(byPlate.data).length === 1, "plate-as-QR returns only the tag code", byPlate);
 const noPlate = await scan({ action: "plate", plate: "KA01ZZ9999" }, "10.9.0.2");
 check(noPlate.status === 404 && noPlate.data.error === "tag_not_found", "unknown plate is 404", noPlate);
+// A plate registered by two accounts is ambiguous: never route to either.
+{
+  const dup = await signIn();
+  const dv = await rest(dup, "POST", "vehicles", { reg_number: plate, make: "Honda", model: "City" });
+  await rest(dup, "POST", "tags", { vehicle_id: dv.data[0].id });
+  const amb = await scan({ action: "plate", plate }, "10.9.0.4");
+  check(amb.status === 404, "a plate claimed by two accounts is not resolved", amb);
+  await rest(dup, "DELETE", `vehicles?id=eq.${dv.data[0].id}`);
+}
 let plateCapped = null;
 for (let i = 0; i < 6; i++) plateCapped = await scan({ action: "plate", plate: `KA01ZZ99${10 + i}` }, "10.9.0.3");
 check(plateCapped.status === 429, "plate guessing is rate-limited per sender", plateCapped);

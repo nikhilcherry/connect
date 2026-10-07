@@ -199,10 +199,14 @@ Deno.serve(async (req) => {
       const { count: fails } = await db.from("scan_failures").select("id", { count: "exact", head: true })
         .eq("ip_hash", ipHash).gte("created_at", minutesAgo(10));
       if ((fails ?? 0) >= LIMITS.plateFailsPerIp10m) return json({ error: "too_many_attempts" }, 429);
-      const { data: v } = await db.from("vehicles").select("id").eq("reg_number", plate).limit(1).maybeSingle();
-      const { data: t } = v
-        ? await db.from("tags").select("code").eq("vehicle_id", v.id).eq("active", true).limit(1).maybeSingle()
+      // Anyone can register any plate, so a plate claimed by more than one
+      // account is ambiguous. Answering "not found" is the safe failure: a
+      // message must never be routed to someone who may have squatted it.
+      const { data: vs } = await db.from("vehicles").select("id").eq("reg_number", plate).limit(5);
+      const { data: tags } = vs?.length
+        ? await db.from("tags").select("code").in("vehicle_id", vs.map((x) => x.id)).eq("active", true).limit(2)
         : { data: null };
+      const t = tags?.length === 1 ? tags[0] : null;
       if (!t) {
         await db.from("scan_failures").insert({ ip_hash: ipHash, tag_code: null });
         return json({ error: "tag_not_found" }, 404);
