@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Start the local stack
+        run: supabase start -x studio,imgproxy,vector,logflare,mailpit
+      - name: Serve the functions
+        run: |
+          # Trust the client-sent IP so the tests can simulate many senders (never in production).
+          echo "SCAN_IP_HOP=first" > supabase/functions/.env.local
+          nohup supabase functions serve --no-verify-jwt --env-file supabase/functions/.env.local > functions.log 2>&1 &
+          sleep 15
+      - name: End-to-end checks
+        run: node supabase/tests/e2e.mjs
+      - name: Function log on failure
+        if: failure()
+        run: cat functions.log
