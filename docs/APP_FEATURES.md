@@ -62,6 +62,7 @@ Abuse protection: 5 alerts per sender per 10 min, 10 per tag per hour, hashed IP
 - **Documents**: photos of RC, insurance, PUC and licence, with pinch-zoom viewer. Stays on the phone.
 - **Renewals**: PUC, insurance and service reminders at 30 days, 7 days and on the day.
 - **Where did I park**: location, note, photo, paid-parking reminder. Stays on the phone.
+- **Sound check** (new, experimental): the phone sends and receives short messages as sound, with no internet, Wi-Fi or Bluetooth. Pick ultrasonic (about 17.6–20 kHz) or audible tones, then Send on one phone and Listen on another, or Loopback on one phone. It is the groundwork for a sound-based proof of presence.
 - **Fit Check**: space rules of thumb for a parking slot (length and door-opening width).
 - **Challan check**: copies the plate and opens the official Parivahan e-challan site.
 - **Family**: invite up to 5 people; only the owner can change the plate or tag.
@@ -82,6 +83,7 @@ All inference runs on the phone; nothing is sent while you look around.
 | Damage detection | Own YOLO11s, INT8, 12.5 MB, plus a hand-set ₹ cost table | mAP50 0.40; reliable on glass, crack, dent, scratch only; lamp and tyre flagged low confidence |
 | Situation understanding | ML Kit image labelling, conservative | Suggests a reason only on distinctive signs (wreck, tow truck, gate); otherwise the person picks |
 | Language bridge | ML Kit language-id and translation, packs of ~30 MB downloaded once | Verified on an emulator |
+| Sound link | Own 16-tone MFSK modem in plain Dart (`acoustic_modem.dart`), CRC-8 checked, ultrasonic and audible profiles; speaker and mic glue in `sound_link.dart` | 8 software tests pass (offset, noise, silence, corruption). **Not yet confirmed on real speakers and mics**; whether ultrasound works depends on the phone |
 | Voice dictation | Phone speech recogniser | Starts on the emulator; real speech untested |
 
 The cost range is an assumption-based estimate, never a quote.
@@ -102,6 +104,7 @@ Parking spot, fuel and expense log, service history, document photos, damage pho
 
 - 130 backend end-to-end checks (`supabase/tests/e2e.mjs`).
 - 87 app tests, including `shipped_models_test.dart`, which guards against an ONNX model the phone's runtime would reject.
+- 8 modem tests (`test/acoustic_modem_test.dart`): round trip at an odd offset, noise, silence, and a corrupted frame, for both profiles.
 - On-device ML checks on an Android 15 emulator (`integration_test/ml_test.dart`).
 - CI workflow with the Flutter version pinned to 3.44.0.
 - `ml/`: training, data prep and export scripts for the three models.
@@ -113,6 +116,7 @@ Parking spot, fuel and expense log, service history, document photos, damage pho
 - **Scan page and edge functions** are not forwarded to the phones, so the stranger flow and the `scan` function are untested from a real phone.
 - **Placeholders**: `connect.example.com` for the scan and app domain, and no real Supabase project ref or Firebase keys.
 - **Real-device testing**: the app has run on an emulator only. Camera, mic dictation and the live plate view are not yet confirmed on a physical phone.
+- **Sound link**: only proven in software. The speaker and mic test on a real phone is the next step, and the ultrasonic profile may not work on every phone. Sound check is installed on one iQOO.
 - **Models**: not trained on a large Indian dataset. Plate recall is 28 of 46 on a small hand-labelled set; damage mAP50 is modest.
 - **Voice notes from the stranger** are not handled, because the scan page has no on-device model.
 - **Licences**: Ultralytics (YOLO) is AGPL-3.0, and the plate test set is evaluation-only.

@@ -16,6 +16,7 @@ import 'onboarding.dart';
 import 'parking_screen.dart';
 import 'damage_report_screen.dart';
 import 'plate_scan_screen.dart';
+import 'sound_check_screen.dart';
 import 'society_screen.dart';
 import 'tag_screen.dart';
 import 'wallet_screen.dart';
@@ -120,6 +121,13 @@ class GarageTab extends StatelessWidget {
               title: tr('Reach a car by its plate'),
               subtitle: tr('Point the camera at any number plate; the reading happens on this phone'),
               onTap: () => push(context, const PlateScanScreen()),
+            ),
+            const Divider(),
+            _Row(
+              icon: Icons.graphic_eq,
+              title: 'Sound check',
+              subtitle: 'Can this phone talk to another by sound? Works with no internet',
+              onTap: () => push(context, const SoundCheckScreen()),
             ),
             const Divider(),
             _Row(
