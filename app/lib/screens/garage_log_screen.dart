@@ -37,7 +37,11 @@ class _GarageLogScreenState extends State<GarageLogScreen> {
       };
 
   Future<void> _exportPdf(List<LogEntry> all) async {
-    final v = AppScope.read(context).vehicle!;
+    final v = AppScope.read(context).vehicle;
+    if (v == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('Connect once to load your car, then you can export the PDF.'))));
+      return;
+    }
     setState(() => _exporting = true);
     try {
       final bytes = await ServiceReport.build(v, all);

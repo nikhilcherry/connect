@@ -1,13 +1,21 @@
 import 'dart:async';
-import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../l10n.dart';
 import '../services/acoustic_modem.dart';
 import '../services/sound_link.dart';
+import '../theme.dart';
+import '../widgets/common.dart';
+import '../widgets/motion.dart';
 
-/// Whether this phone's speaker and mic can carry the sound link, and the
-/// two-phone test: one sends, the other listens.
+enum _Result { untested, testing, heard, silent }
+
+/// Whether this phone's speaker and microphone can carry the sound link:
+/// it plays a frame on each band and listens for its own voice. A phone that
+/// hears itself can be heard by a phone beside it; one that cannot reach
+/// ultrasound still has the audible tones.
 class SoundCheckScreen extends StatefulWidget {
   const SoundCheckScreen({super.key});
 
@@ -16,85 +24,92 @@ class SoundCheckScreen extends StatefulWidget {
 }
 
 class _SoundCheckScreenState extends State<SoundCheckScreen> {
-  bool _ultra = true;
+  final _link = SoundLink(hearSelf: true);
+  final _results = {for (final p in SoundLink.profiles) p.name: _Result.untested};
   bool _busy = false;
-  String _log = 'Pick a profile, then Send on one phone and Listen on the other, '
-      'or Loopback to test this phone alone.';
-  double _level = 0;
+  String? _error;
 
-  SoundLink get _link => SoundLink(AcousticModem(_ultra ? ModemProfile.ultrasonic : ModemProfile.audible));
+  static const _probe = [0x43, 0x4F, 0x4E, 0x4E]; // "CONN"
 
-  void _say(String s) {
-    if (mounted) setState(() => _log = s);
+  @override
+  void dispose() {
+    _link.dispose();
+    super.dispose();
   }
 
-  Future<void> _run(Future<void> Function(SoundLink) job) async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    final link = _link;
+  Future<void> _run() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+      _results.updateAll((_, _) => _Result.untested);
+    });
     try {
-      if (!await link.hasMic()) {
-        _say('Microphone permission denied.');
+      if (!await _link.hasMic()) {
+        setState(() => _error = tr('Allow the microphone so this phone can hear others.'));
         return;
       }
-      await job(link);
+      await _link.listen();
+      for (final p in SoundLink.profiles) {
+        if (!mounted) return;
+        setState(() => _results[p.name] = _Result.testing);
+        final heard = _link.frames.firstWhere((f) => f.profile == p && listEquals(f.payload, _probe));
+        await _link.send(_probe, p);
+        final ok = await heard.then((_) => true).timeout(const Duration(seconds: 3), onTimeout: () => false);
+        if (!mounted) return;
+        setState(() => _results[p.name] = ok ? _Result.heard : _Result.silent);
+      }
     } catch (e) {
-      _say('Error: $e');
+      debugPrint('sound check failed: $e');
+      if (mounted) setState(() => _error = tr('The test could not run on this phone.'));
     } finally {
-      await link.dispose();
+      await _link.stopListening();
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  static const _word = 'CONNECT1';
-
-  Future<void> _send() => _run((l) async {
-        _say('Sending "$_word" as ${_ultra ? 'ultrasound' : 'audible tones'}…');
-        await l.send(utf8.encode(_word));
-        _say('Sent.');
-      });
-
-  Future<void> _listen({bool alsoSend = false}) => _run((l) async {
-        _say(alsoSend ? 'Loopback: playing and listening on this phone…' : 'Listening…');
-        final sub = l.listen().listen((e) {
-          if (!mounted) return;
-          setState(() => _level = e.level);
-          if (e.payload != null) _say('Heard: "${utf8.decode(e.payload!, allowMalformed: true)}"');
-        });
-        if (alsoSend) {
-          await Future.delayed(const Duration(milliseconds: 800));
-          await l.send(utf8.encode(_word));
-        }
-        await sub.asFuture<void>();
-        if (_log.startsWith('Loopback') || _log == 'Listening…') {
-          _say('Nothing decoded. If the level bar moved, the mic hears something but not the signal.');
-        }
-      });
-
   @override
   Widget build(BuildContext context) {
+    Widget row(ModemProfile p, IconData icon, String title, String subtitle) {
+      final r = _results[p.name]!;
+      return InfoRow(
+        icon: icon,
+        tone: r == _Result.heard ? Tone.success : (r == _Result.silent ? Tone.error : null),
+        title: title,
+        subtitle: subtitle,
+        trailing: switch (r) {
+          _Result.untested => StatusBadge(tr('Not tested'), tone: Tone.neutral),
+          _Result.testing => const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+          _Result.heard => StatusBadge(tr('Works'), tone: Tone.success),
+          _Result.silent => StatusBadge(tr('Not heard'), tone: Tone.error),
+        },
+      );
+    }
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Sound check')),
-      body: ListView(padding: const EdgeInsets.all(16), children: [
-        SegmentedButton<bool>(
-          segments: const [
-            ButtonSegment(value: true, label: Text('Ultrasonic')),
-            ButtonSegment(value: false, label: Text('Audible')),
-          ],
-          selected: {_ultra},
-          onSelectionChanged: _busy ? null : (s) => setState(() => _ultra = s.first),
-        ),
-        const SizedBox(height: 16),
-        Wrap(spacing: 8, runSpacing: 8, children: [
-          FilledButton(onPressed: _busy ? null : _send, child: const Text('Send')),
-          FilledButton(onPressed: _busy ? null : () => _listen(), child: const Text('Listen')),
-          OutlinedButton(onPressed: _busy ? null : () => _listen(alsoSend: true), child: const Text('Loopback')),
-        ]),
-        const SizedBox(height: 16),
-        LinearProgressIndicator(value: _level.clamp(0, 1)),
-        const SizedBox(height: 16),
-        Text(_log),
-      ]),
+      appBar: AppBar(title: Text(tr('Test this phone'))),
+      body: SafeArea(
+        child: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 32), children: revealAll([
+          ScreenTitle(tr('Can this phone talk by sound?'), eyebrow: tr('On-device')),
+          const SizedBox(height: 8),
+          Text(
+            tr('The phone plays a short message on each band and listens for its own voice. The volume is turned up for the two seconds it takes and put back.'),
+            style: DLText.body.copyWith(color: DL.muted),
+          ),
+          const SizedBox(height: 20),
+          row(ModemProfile.ultrasonic, Icons.hearing_disabled_outlined, tr('Silent band'), tr('18 to 19.7 kHz, above most adults\' hearing')),
+          const SizedBox(height: 8),
+          row(ModemProfile.audible, Icons.graphic_eq, tr('Audible band'), tr('1.5 to 3.2 kHz, short chirps anyone can hear')),
+          if (_error != null) ...[const SizedBox(height: 12), Text(_error!, style: DLText.body.copyWith(color: DL.error))],
+          const SizedBox(height: 20),
+          FilledButton.icon(
+            onPressed: _busy ? null : _run,
+            icon: const Icon(Icons.play_arrow_outlined),
+            label: Text(_busy ? tr('Testing…') : tr('Run the test')),
+          ),
+          const SizedBox(height: 16),
+          FootNote(tr('Unplug headphones first: the sound has to come out of the phone\'s own speaker.'), icon: Icons.info_outline),
+        ])),
+      ),
     );
   }
 }

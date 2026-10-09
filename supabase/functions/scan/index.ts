@@ -6,7 +6,7 @@
 // POST JSON { action, ... }:
 //   lookup  { code }                              -> vehicle make/model/colour only
 //   plate   { plate }                             -> { code } if a Connect car has that plate (plate-as-QR, OCR runs on-device)
-//   alert   { code, plate_last4, kind, note?, photo?, lang? } -> { alert_id, token }
+//   alert   { code, plate_last4, kind, note?, photo?, lang?, ref?, via? } -> { alert_id, token, duplicate? }
 //   thread  { alert_id, token }                   -> { status, seen, kind, note, messages, owner_status, medical }
 //   reply   { alert_id, token, body }             -> { ok }
 //   trip    { token }                             -> live position of a shared trip (web/trip.html)
@@ -29,6 +29,7 @@ const SALT = Deno.env.get("SCAN_IP_SALT") ?? (LOCAL ? "local-dev-salt" : null);
 const LANGS = new Set(["en", "hi", "kn", "ta"]);
 const KINDS = new Set(["blocking", "lights_on", "towing", "accident", "window_open", "other"]);
 const CODE_RE = /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{8}$/;
+const REF_RE = /^[A-Za-z0-9:_-]{6,64}$/;
 const UUID_RE = /^[0-9a-f-]{36}$/;
 
 const KIND_LABEL: Record<string, string> = {
@@ -240,6 +241,22 @@ Deno.serve(async (req) => {
       // Don't tell a blocked sender they're blocked; it only invites a new IP.
       if (blocked) return json({ alert_id: crypto.randomUUID(), token: randomToken() });
 
+      // The same alert sent again: the sender never got our reply, or a second
+      // phone is delivering a message it also heard by sound. Hand back the
+      // alert that exists, with a fresh token since the first one was lost,
+      // and count nothing against the limits.
+      const ref = typeof body.ref === "string" && REF_RE.test(body.ref) ? body.ref : null;
+      const sameAlert = async () => {
+        if (!ref) return null;
+        const { data } = await db.from("alerts").select("id").eq("tag_code", tag.code).eq("client_ref", ref).maybeSingle();
+        if (!data) return null;
+        const token = randomToken();
+        await db.from("alert_scanners").update({ token_hash: await sha256(token) }).eq("alert_id", data.id);
+        return json({ alert_id: data.id, token, duplicate: true });
+      };
+      const again = await sameAlert();
+      if (again) return again;
+
       const { count: recentByIp } = await db.from("alert_scanners")
         .select("alert_id, alerts!inner(created_at)", { count: "exact", head: true })
         .eq("ip_hash", ipHash).gte("alerts.created_at", minutesAgo(10));
@@ -256,7 +273,14 @@ Deno.serve(async (req) => {
         kind: body.kind,
         note,
         scanner_lang: typeof body.lang === "string" && LANGS.has(body.lang) ? body.lang : "en",
+        client_ref: ref,
+        via: body.via === "sound" ? "sound" : "tag",
       }).select("id").single();
+      // Two deliveries of one reference can race; the unique index lets one in.
+      if (error?.code === "23505") {
+        const raced = await sameAlert();
+        if (raced) return raced;
+      }
       if (error || !alert) return json({ error: "insert_failed" }, 500);
 
       const token = randomToken();

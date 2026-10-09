@@ -17,6 +17,8 @@ import 'services/parking.dart';
 import 'services/push.dart';
 import 'services/trip_share.dart';
 import 'services/wallet.dart';
+import 'services/whisper.dart';
+import 'screens/offline_hub_screen.dart';
 import 'theme.dart';
 import 'widgets/common.dart';
 import 'widgets/motion.dart';
@@ -26,7 +28,7 @@ final navigatorKey = GlobalKey<NavigatorState>();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Supabase.initialize(url: Config.supabaseUrl, publishableKey: Config.supabaseAnonKey);
-  await Future.wait([L10n.load(), Notifications.init(), ParkingStore.load(), GarageLog.load(), Wallet.load()]);
+  await Future.wait([L10n.load(), Notifications.init(), ParkingStore.load(), GarageLog.load(), Wallet.load(), WhisperStore.load()]);
   final state = AppState(Supabase.instance.client)..bootstrap();
   unawaited(Push.init(state));
   unawaited(TripShare.resume(state));
@@ -87,10 +89,10 @@ class _ConnectAppState extends State<ConnectApp> {
     final alertId = data['alert_id'] as String?;
     final societyId = data['society_id'] as String?;
     if (alertId != null) {
-      if (!s.alerts.any((a) => a.id == alertId)) await s.refresh();
+      if (!s.alerts.any((a) => a.id == alertId)) await s.reload();
       nav.push(MaterialPageRoute(builder: (_) => AlertThreadScreen(alertId: alertId)));
     } else if (societyId != null) {
-      await s.refresh();
+      await s.reload();
       if (s.societies.any((x) => x.id == societyId)) {
         nav.push(MaterialPageRoute(builder: (_) => SocietyScreen(societyId: societyId)));
       }
@@ -145,6 +147,11 @@ class AppRoot extends StatelessWidget {
               Text(s.loadError!, textAlign: TextAlign.center, style: DLText.body.copyWith(color: DL.muted)),
               const SizedBox(height: 24),
               FilledButton(onPressed: s.bootstrap, child: Text(tr('Try again'))),
+              const SizedBox(height: 8),
+              OutlinedButton(
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const OfflineHubScreen())),
+                child: Text(tr('Use offline tools')),
+              ),
             ])),
           ),
         ),

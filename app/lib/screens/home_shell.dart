@@ -34,7 +34,22 @@ class _HomeShellState extends State<HomeShell> {
     // Outline icons at rest; the filled glyph appears only inside the active circle.
     Widget alertsIcon(IconData icon) => Badge(isLabelVisible: open > 0, label: Text('$open'), child: Icon(icon));
     return Scaffold(
-      body: FadeThroughStack(index: _index, children: const [HomeTab(), AlertsTab(), SafetyTab(), GarageTab()]),
+      body: Column(children: [
+        AnimatedSize(
+          duration: DL.medium,
+          curve: DL.ease,
+          alignment: Alignment.topCenter,
+          child: state.offline ? const _OfflineBanner() : const SizedBox(width: double.infinity),
+        ),
+        Expanded(
+          // The banner already sits under the status bar; the tabs must not leave room for it twice.
+          child: MediaQuery.removePadding(
+            context: context,
+            removeTop: state.offline,
+            child: FadeThroughStack(index: _index, children: const [HomeTab(), AlertsTab(), SafetyTab(), GarageTab()]),
+          ),
+        ),
+      ]),
       bottomNavigationBar: DecoratedBox(
         decoration: const BoxDecoration(color: DL.card, boxShadow: DL.floatShadow),
         child: NavigationBar(
@@ -47,6 +62,60 @@ class _HomeShellState extends State<HomeShell> {
             NavigationDestination(icon: const Icon(Icons.shield_outlined), selectedIcon: const Icon(Icons.shield), label: tr('Safety')),
             NavigationDestination(icon: const Icon(Icons.directions_car_outlined), selectedIcon: const Icon(Icons.directions_car), label: tr('Garage')),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown while the app runs from the copy saved on this phone. The app keeps
+/// retrying by itself; the button retries at once.
+class _OfflineBanner extends StatefulWidget {
+  const _OfflineBanner();
+
+  @override
+  State<_OfflineBanner> createState() => _OfflineBannerState();
+}
+
+class _OfflineBannerState extends State<_OfflineBanner> {
+  bool _trying = false;
+
+  Future<void> _retry() async {
+    setState(() => _trying = true);
+    final ok = await AppScope.read(context).reload();
+    if (!mounted) return;
+    setState(() => _trying = false);
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('Still no connection. Everything saved on this phone keeps working.'))));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = Tone.warning;
+    return Material(
+      color: tone.bg,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 6, 8, 6),
+          child: Row(children: [
+            Icon(Icons.cloud_off_outlined, size: 18, color: tone.fg),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                tr('Offline. Showing what is saved on this phone.'),
+                style: DLText.small.copyWith(color: tone.fg, fontWeight: FontWeight.w600),
+              ),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: tone.fg, minimumSize: const Size(64, 40)),
+              onPressed: _trying ? null : _retry,
+              child: _trying
+                  ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: tone.fg))
+                  : Text(tr('Retry')),
+            ),
+          ]),
         ),
       ),
     );

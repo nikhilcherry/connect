@@ -469,6 +469,11 @@
   // browser reports it is back online. HTTP errors still show as before.
   let retryTimer = null;
   const isNetworkError = (e) => !e.code;
+  // One reference per message, kept across retries: if the alert got through
+  // and only the reply was lost, the server hands back the same alert instead
+  // of sending the owner a second one.
+  let alertRef = null;
+  const newRef = () => "web-" + (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 12));
 
   async function send() {
     clearTimeout(retryTimer);
@@ -478,7 +483,9 @@
     btn.textContent = t("sending");
     $("compose-error").textContent = "";
     try {
-      const r = await call({ action: "alert", code, kind, plate_last4: $("plate").value, note: $("note").value, photo, lang });
+      alertRef ??= newRef();
+      const r = await call({ action: "alert", code, kind, plate_last4: $("plate").value, note: $("note").value, photo, lang, ref: alertRef });
+      alertRef = null;
       thread = { alert_id: r.alert_id, token: r.token };
       threadAt = Date.now();
       store.set(`dlc-thread-${code}`, JSON.stringify({ ...thread, at: Date.now() }));

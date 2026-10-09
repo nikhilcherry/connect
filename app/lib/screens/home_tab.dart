@@ -32,7 +32,7 @@ class HomeTab extends StatelessWidget {
 
     return SafeArea(
       child: RefreshIndicator(
-        onRefresh: s.refresh,
+        onRefresh: s.reload,
         child: ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 32), children: revealAll([
           ScreenTitle(
             v.title,

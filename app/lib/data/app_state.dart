@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../l10n.dart';
 import '../services/notifications.dart';
+import '../services/whisper.dart';
 import 'models.dart';
 
 /// Single source of truth for the signed-in owner. v1 supports one vehicle
@@ -23,6 +25,11 @@ class AppState extends ChangeNotifier {
   /// refusing us. The two need different screens: "Offline" for a server-side
   /// fault sends people checking their Wi-Fi for nothing.
   bool loadErrorIsNetwork = false;
+
+  /// True while the screen shows what was saved on this phone because the
+  /// server could not be reached. Everything that lives on the phone keeps
+  /// working; anything that needs the server fails with the usual message.
+  bool offline = false;
   Vehicle? vehicle;
 
   /// Every car this user owns or shares; [vehicle] is the one on screen.
@@ -72,42 +79,61 @@ class AppState extends ChangeNotifier {
     loadError = null;
     notifyListeners();
     try {
-      if (_db.auth.currentSession == null) {
-        await _db.auth.signInAnonymously();
-      }
-      try {
-        await refresh();
-      } on PostgrestException catch (e) {
-        // A stored session that can no longer be refreshed leaves the client
-        // on the bare anon key, which has no table access. Start a fresh one.
-        if (e.code != '42501' && e.code != 'PGRST301') rethrow;
-        debugPrint('session unusable (${e.code}); signing in again');
-        await _db.auth.signOut(scope: SignOutScope.local);
-        await _db.auth.signInAnonymously();
-        await refresh();
-      }
+      // Without a limit, a connection that accepts and then stalls (a captive
+      // portal, a dead tunnel) leaves the loading screen up for a minute.
+      await _signInAndLoad().timeout(_patience);
     } catch (e) {
-      loadErrorIsNetwork = isNetworkError(e);
-      loadError = loadErrorIsNetwork
-          ? tr('Couldn\'t reach Connect. Check your internet and try again.')
-          : tr('Connect couldn\'t sign you in right now. We\'re on it — please try again in a few minutes. ({code})', {'code': errorCode(e)});
       debugPrint('bootstrap failed: $e');
+      // A car that loaded before can be shown from the copy on this phone: the
+      // tag, the garage and every on-device tool need no server.
+      if (await _restoreCache()) {
+        _wentOffline();
+      } else {
+        loadErrorIsNetwork = isNetworkError(e);
+        loadError = loadErrorIsNetwork
+            ? tr('Couldn\'t reach Connect. Check your internet and try again.')
+            : tr('Connect couldn\'t sign you in right now. We\'re on it — please try again in a few minutes. ({code})', {'code': errorCode(e)});
+      }
     } finally {
       loading = false;
       notifyListeners();
     }
   }
 
+  static const _patience = Duration(seconds: 15);
+
+  Future<void> _signInAndLoad() async {
+    if (_db.auth.currentSession == null) {
+      await _db.auth.signInAnonymously();
+    }
+    try {
+      await refresh();
+    } on PostgrestException catch (e) {
+      // A stored session that can no longer be refreshed leaves the client
+      // on the bare anon key, which has no table access. Start a fresh one.
+      if (e.code != '42501' && e.code != 'PGRST301') rethrow;
+      debugPrint('session unusable (${e.code}); signing in again');
+      await _db.auth.signOut(scope: SignOutScope.local);
+      await _db.auth.signInAnonymously();
+      await refresh();
+    }
+  }
+
   // Connection failures surface as different types depending on which client
   // failed (auth vs. REST) and the platform (dart:io vs. web), and those types
   // aren't all exported, so match on the runtime type name as a fallback.
-  @visibleForTesting
   static bool isNetworkError(Object e) {
     if (e is AuthRetryableFetchException || e is TimeoutException) return true;
+    // A proxy answering in the server's place (a tunnel that is down, a
+    // gateway timeout) is the server being out of reach, not it refusing us.
+    if (e is PostgrestException && _gateway.contains(e.code)) return true;
+    if (e is AuthException && _gateway.contains(e.statusCode)) return true;
     final t = '${e.runtimeType} $e';
     return t.contains('SocketException') || t.contains('ClientException') ||
         t.contains('Failed host lookup') || t.contains('Connection refused');
   }
+
+  static const _gateway = {'502', '503', '504', '520', '521', '522', '523', '524', '530'};
 
   /// A short code people can screenshot; the full error goes to the log.
   @visibleForTesting
@@ -120,20 +146,150 @@ class AppState extends ChangeNotifier {
 
   Future<void> refresh() async {
     // RLS returns cars the user owns and cars shared with them; show their own first.
-    vehicles = (await _db.from('vehicles').select().order('created_at', ascending: true)).map(Vehicle.fromJson).toList();
+    final rows = await _db.from('vehicles').select().order('created_at', ascending: true);
+    _rows['vehicles'] = rows;
+    vehicles = rows.map(Vehicle.fromJson).toList();
     final prefs = await SharedPreferences.getInstance();
-    final chosen = vehicles.where((v) => v.id == prefs.getString(_activeKey)).firstOrNull;
-    vehicle = chosen ?? vehicles.where((v) => v.owner == userId).firstOrNull ?? vehicles.firstOrNull;
+    vehicle = _activeAmong(vehicles, prefs);
     if (vehicle != null) {
       final tags = await _db.from('tags').select().eq('vehicle_id', vehicle!.id).order('created_at', ascending: false).limit(1);
+      _rows['tag'] = tags.firstOrNull;
       tag = tags.isEmpty ? null : Tag.fromJson(tags.first);
     } else {
+      _rows['tag'] = null;
       tag = null;
     }
     await Future.wait([_loadAlerts(), _loadContacts(), _loadFamily(), _loadSocieties()]);
     await Notifications.scheduleExpiryReminders(vehicle);
     if (_foreground || !pushActive) _subscribe();
+    offline = false;
+    _retries = 0;
+    _retry?.cancel();
+    _saveSoon();
     notifyListeners();
+    // The server answered, so anything this phone is carrying can go now.
+    unawaited(WhisperStore.flush(deliverWhisper));
+  }
+
+  Vehicle? _activeAmong(List<Vehicle> all, SharedPreferences prefs) =>
+      all.where((v) => v.id == prefs.getString(_activeKey)).firstOrNull ??
+      all.where((v) => v.owner == userId).firstOrNull ??
+      all.firstOrNull;
+
+  // ---------------------------------------------------------------- offline copy
+
+  /// The server rows behind what is on screen, saved so the app can open with
+  /// no connection: showing your own tag must not need the internet.
+  final Map<String, dynamic> _rows = {};
+  static const _cacheKey = 'state_cache_v1';
+  Timer? _save;
+  Timer? _retry;
+  int _retries = 0;
+
+  void _saveSoon() => _save ??= Timer(const Duration(seconds: 1), () {
+        _save = null;
+        _saveCache();
+      });
+
+  Future<void> _saveCache() async {
+    final id = userId;
+    if (id == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_cacheKey, jsonEncode({'user': id, ..._rows}));
+    } catch (e) {
+      debugPrint('saving the offline copy failed: $e');
+    }
+  }
+
+  /// Fills the state from the saved copy. False when there is none for this
+  /// user, or it holds no car: without one there is nothing to show.
+  Future<bool> _restoreCache() async {
+    try {
+      final id = userId;
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_cacheKey);
+      if (id == null || raw == null) return false;
+      final j = jsonDecode(raw) as Map<String, dynamic>;
+      if (j['user'] != id) return false;
+      final restored = restoreRows(j, id, prefs.getString(_activeKey));
+      if (restored.vehicle == null) return false;
+      vehicles = restored.vehicles;
+      vehicle = restored.vehicle;
+      tag = restored.tag;
+      alerts = restored.alerts;
+      contacts = restored.contacts;
+      family = restored.family;
+      societies = restored.societies;
+      notices = restored.notices;
+      _rows
+        ..clear()
+        ..addAll(j..remove('user'));
+      return true;
+    } catch (e) {
+      debugPrint('offline copy unreadable: $e');
+      return false;
+    }
+  }
+
+  /// The saved rows as models. Pure, so the shape of the copy is tested
+  /// without a phone or a server.
+  @visibleForTesting
+  static ({
+    List<Vehicle> vehicles,
+    Vehicle? vehicle,
+    Tag? tag,
+    List<CarAlert> alerts,
+    List<EmergencyContact> contacts,
+    List<FamilyMember> family,
+    List<Society> societies,
+    List<SocietyNotice> notices,
+  }) restoreRows(Map<String, dynamic> j, String userId, String? activeId) {
+    List<Map<String, dynamic>> rows(String k) => ((j[k] as List?) ?? const []).cast<Map<String, dynamic>>();
+    final vehicles = rows('vehicles').map(Vehicle.fromJson).toList();
+    final vehicle = vehicles.where((v) => v.id == activeId).firstOrNull ??
+        vehicles.where((v) => v.owner == userId).firstOrNull ??
+        vehicles.firstOrNull;
+    final t = j['tag'] as Map<String, dynamic>?;
+    return (
+      vehicles: vehicles,
+      vehicle: vehicle,
+      // The copy holds the tag of the car that was on screen when it was saved.
+      tag: t == null || t['vehicle_id'] != vehicle?.id ? null : Tag.fromJson(t),
+      alerts: rows('alerts').map(CarAlert.fromJson).toList(),
+      contacts: rows('contacts').map(EmergencyContact.fromJson).toList(),
+      family: rows('family').map(FamilyMember.fromJson).toList(),
+      societies: rows('societies').map((r) => Society.fromJson(r, userId)).toList(),
+      notices: rows('notices').map(SocietyNotice.fromJson).toList(),
+    );
+  }
+
+  /// Marks the app offline and tries the server again by itself, backing off
+  /// from 5 s to 30 s. The banner's button retries at once.
+  void _wentOffline() {
+    offline = true;
+    _retry?.cancel();
+    final wait = Duration(seconds: const [5, 10, 20, 30][_retries.clamp(0, 3)]);
+    _retries++;
+    _retry = Timer(wait, () {
+      if (_foreground) reload();
+    });
+  }
+
+  /// Loads from the server again. When it can't be reached this keeps what is
+  /// on screen and says so, instead of throwing. True when the load worked.
+  Future<bool> reload() async {
+    try {
+      await refresh().timeout(_patience);
+      return true;
+    } catch (e) {
+      debugPrint('reload failed: $e');
+      if (isNetworkError(e)) {
+        _wentOffline();
+        notifyListeners();
+      }
+      return false;
+    }
   }
 
   // ---------------------------------------------------------------- lifecycle + push
@@ -152,7 +308,7 @@ class AppState extends ChangeNotifier {
   void onForeground() {
     _foreground = true;
     if (userId == null || vehicle == null) return;
-    refresh().catchError((Object e) => debugPrint('resume refresh failed: $e'));
+    reload();
   }
 
   void onBackground() {
@@ -170,20 +326,25 @@ class AppState extends ChangeNotifier {
 
   Future<void> _loadFamily() async {
     if (vehicle == null) {
+      _rows['family'] = const [];
       family = [];
       return;
     }
     final rows = await _db.from('vehicle_members').select().eq('vehicle_id', vehicle!.id).order('created_at', ascending: true);
+    _rows['family'] = rows;
     family = rows.map(FamilyMember.fromJson).toList();
   }
 
   Future<void> _loadAlerts() async {
     final rows = await _db.from('alerts').select().order('updated_at', ascending: false).limit(100);
+    _rows['alerts'] = rows;
     alerts = rows.map(CarAlert.fromJson).toList();
+    _saveSoon();
   }
 
   Future<void> _loadContacts() async {
     final rows = await _db.from('emergency_contacts').select().order('created_at', ascending: true);
+    _rows['contacts'] = rows;
     contacts = rows.map(EmergencyContact.fromJson).toList();
   }
 
@@ -194,6 +355,8 @@ class AppState extends ChangeNotifier {
       // Societies are optional; a backend without them (not yet migrated, or
       // briefly failing) mustn't keep the car and its alerts from loading.
       debugPrint('societies unavailable: $e');
+      _rows['societies'] = const [];
+      _rows['notices'] = const [];
       societies = [];
       notices = [];
     }
@@ -201,8 +364,10 @@ class AppState extends ChangeNotifier {
 
   Future<void> _fetchSocieties() async {
     final rows = await _db.from('societies').select(Society.columns).order('created_at', ascending: true);
+    _rows['societies'] = rows;
     societies = rows.map((r) => Society.fromJson(r, userId)).toList();
     if (societies.isEmpty) {
+      _rows['notices'] = const [];
       notices = [];
       return;
     }
@@ -212,6 +377,7 @@ class AppState extends ChangeNotifier {
         .inFilter('society_id', societies.map((x) => x.id).toList())
         .order('created_at', ascending: false)
         .limit(50);
+    _rows['notices'] = n;
     notices = n.map(SocietyNotice.fromJson).toList();
   }
 
@@ -389,6 +555,36 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// Hands a message that reached this phone by sound to the server, as any
+  /// phone standing at the car could: the plate it carries is the proof of
+  /// presence, and its reference makes sure the owner gets it once however
+  /// many phones heard it.
+  Future<Delivery> deliverWhisper(HeardWhisper h) async {
+    final w = h.whisper;
+    try {
+      final code = await findTagByPlate(w.plate);
+      if (code == null) return Delivery.unknownCar;
+      await _db.functions.invoke('scan', body: {
+        'action': 'alert',
+        'code': code,
+        'plate_last4': w.plate.substring(w.plate.length - 4),
+        'kind': w.kindWire,
+        'lang': w.lang.code,
+        'ref': w.ref(h.at),
+        'via': 'sound',
+      });
+      return Delivery.delivered;
+    } on FunctionException catch (e) {
+      debugPrint('whisper delivery refused: ${e.status} ${e.details}');
+      // Not on Connect, or no longer the car we thought: nothing more to do.
+      // Anything else (a rate limit, a server fault) is worth another try.
+      return e.status == 404 || e.status == 403 ? Delivery.unknownCar : Delivery.later;
+    } catch (e) {
+      debugPrint('whisper delivery waits: $e');
+      return Delivery.later;
+    }
+  }
+
   /// Posts to everyone in the society, then asks the server to push it.
   Future<void> postNotice(String societyId, String body) async {
     final row = await _db.from('society_notices').insert({'society_id': societyId, 'body': body.trim()}).select('id').single();
@@ -547,6 +743,8 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     _unsubscribeAll();
+    _retry?.cancel();
+    _save?.cancel();
     super.dispose();
   }
 }

@@ -84,6 +84,18 @@ class Notifications {
     );
   }
 
+  /// A message a nearby phone sent by sound about one of this phone's cars.
+  /// It has not been to the server, so there is no thread to open yet.
+  static Future<void> showWhisper(AlertKind kind, Vehicle? v, int nonce) async {
+    if (!_ready) return;
+    await _plugin.show(
+      id: 3000 + (nonce & 0xFFF),
+      title: '${tr(kind.label)}: ${v == null ? tr('your car') : v.title}',
+      body: tr('Someone next to your car said this by sound. No internet was needed.'),
+      notificationDetails: const NotificationDetails(android: _alerts),
+    );
+  }
+
   static const _parking = AndroidNotificationDetails(
     'parking',
     'Parking reminders',

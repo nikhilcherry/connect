@@ -16,10 +16,10 @@ import 'onboarding.dart';
 import 'parking_screen.dart';
 import 'damage_report_screen.dart';
 import 'plate_scan_screen.dart';
-import 'sound_check_screen.dart';
 import 'society_screen.dart';
 import 'tag_screen.dart';
 import 'wallet_screen.dart';
+import 'whisper_screen.dart';
 
 class GarageTab extends StatelessWidget {
   const GarageTab({super.key});
@@ -40,7 +40,9 @@ class GarageTab extends StatelessWidget {
               ChoiceChip(
                 label: Text(c.title),
                 selected: c.id == v.id,
-                onSelected: (_) => s.selectVehicle(c.id),
+                onSelected: (_) => s.selectVehicle(c.id).catchError((Object e) {
+                  if (context.mounted) showError(context, e);
+                }),
               ),
           ]),
           const SizedBox(height: 16),
@@ -125,9 +127,9 @@ class GarageTab extends StatelessWidget {
             const Divider(),
             _Row(
               icon: Icons.graphic_eq,
-              title: 'Sound check',
-              subtitle: 'Can this phone talk to another by sound? Works with no internet',
-              onTap: () => push(context, const SoundCheckScreen()),
+              title: tr('Say it with sound'),
+              subtitle: tr('No signal in the basement? Pass the message on by sound, phone to phone'),
+              onTap: () => push(context, const WhisperScreen()),
             ),
             const Divider(),
             _Row(

@@ -433,6 +433,38 @@ check(dead.status === 404, "deactivated tag stops working", dead);
   check(mine.data.length === 2, "owner sees both cars", mine);
 }
 
+// --- the same alert sent twice lands once (a retry after a lost reply, or two phones relaying it by sound)
+{
+  const o = await signIn();
+  const reg = `KA03RF${Math.floor(1000 + Math.random() * 9000)}`;
+  const car = await rest(o, "POST", "vehicles", { reg_number: reg, make: "Tata", model: "Punch" });
+  const tg = await rest(o, "POST", "tags", { vehicle_id: car.data[0].id });
+  const c = tg.data[0].code, l4 = reg.slice(-4);
+  const ref = `snd-20261009-1-${Math.random().toString(16).slice(2, 6)}`;
+  const first = await scan({ action: "alert", code: c, kind: "lights_on", plate_last4: l4, ref, via: "sound", lang: "kn" }, "203.0.113.11");
+  check(first.status === 200 && first.data.alert_id && !first.data.duplicate, "an alert with a reference is sent", first);
+  const again = await scan({ action: "alert", code: c, kind: "lights_on", plate_last4: l4, ref, via: "sound" }, "203.0.113.12");
+  check(again.status === 200 && again.data.alert_id === first.data.alert_id && again.data.duplicate === true,
+    "the same reference from a second phone returns the same alert", again);
+  const rows = await rest(o, "GET", `alerts?select=id,via,client_ref&vehicle_id=eq.${car.data[0].id}`);
+  check(rows.data.length === 1 && rows.data[0].via === "sound", "the owner gets it once, marked as carried by sound", rows);
+  const t2 = await scan({ action: "thread", alert_id: again.data.alert_id, token: again.data.token }, "203.0.113.12");
+  check(t2.data.kind === "lights_on", "the fresh token opens the thread", t2);
+  const t1 = await scan({ action: "thread", alert_id: first.data.alert_id, token: first.data.token }, "203.0.113.11");
+  check(t1.data.messages.length === 0 && !t1.data.kind, "the token it replaced no longer does", t1);
+  const wrongPlate = await scan({ action: "alert", code: c, kind: "lights_on", plate_last4: "0000", ref }, "203.0.113.13");
+  check(wrongPlate.status === 403, "a known reference does not skip the plate check", wrongPlate);
+  const other = await scan({ action: "alert", code: c, kind: "blocking", plate_last4: l4, ref: `${ref}x` }, "203.0.113.11");
+  check(other.status === 200 && other.data.alert_id !== first.data.alert_id && !other.data.duplicate, "a different reference is a new alert", other);
+  const junk = await scan({ action: "alert", code: c, kind: "blocking", plate_last4: l4, ref: "no spaces!", via: "carrier pigeon" }, "203.0.113.14");
+  const junkRow = await rest(o, "GET", `alerts?select=via,client_ref&id=eq.${junk.data.alert_id}`);
+  check(junk.status === 200 && junkRow.data[0].client_ref === null && junkRow.data[0].via === "tag",
+    "a malformed reference or route is ignored, not stored", [junk, junkRow]);
+  for (let i = 0; i < 6; i++) await scan({ action: "alert", code: c, kind: "lights_on", plate_last4: l4, ref }, "203.0.113.20");
+  const fresh = await scan({ action: "alert", code: c, kind: "window_open", plate_last4: l4 }, "203.0.113.20");
+  check(fresh.status === 200, "repeats of one alert do not use up the sender's allowance", fresh);
+}
+
 // --- account deletion
 {
   const goner = await signIn();

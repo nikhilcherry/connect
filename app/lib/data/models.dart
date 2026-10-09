@@ -143,6 +143,7 @@ class CarAlert {
     this.scannerLang = AppLang.en,
     this.seenAt,
     this.handledBy,
+    this.viaSound = false,
   });
 
   final String id;
@@ -158,6 +159,10 @@ class CarAlert {
 
   /// The family member who last set this alert to "on my way" or "sorted".
   final String? handledBy;
+
+  /// Another phone carried this out of a place with no signal (see
+  /// services/whisper.dart). The sender was offline and may never see a reply.
+  final bool viaSound;
   final AlertStatus status;
   final bool blocked;
   final String? note;
@@ -177,6 +182,7 @@ class CarAlert {
         photoPath: j['photo_path'] as String?,
         scannerLang: AppLang.values.firstWhere((l) => l.code == j['scanner_lang'], orElse: () => AppLang.en),
         handledBy: j['handled_by'] as String?,
+        viaSound: j['via'] == 'sound',
         seenAt: j['seen_at'] == null ? null : DateTime.parse(j['seen_at'] as String).toLocal(),
         createdAt: DateTime.parse(j['created_at'] as String).toLocal(),
         updatedAt: DateTime.parse(j['updated_at'] as String).toLocal(),

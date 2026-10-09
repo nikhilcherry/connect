@@ -26,7 +26,7 @@ class FamilyScreen extends StatelessWidget {
       appBar: AppBar(title: Text(tr('Family'))),
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: s.refresh,
+          onRefresh: s.reload,
           child: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 32), children: [
             ScreenTitle(tr('Who gets alerts'), eyebrow: tr('{n} of {max}', {'n': s.family.length + 1, 'max': maxMembers + 1})),
             const SizedBox(height: 8),

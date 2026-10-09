@@ -18,6 +18,9 @@ android {
 
     defaultConfig {
         applicationId = "app.connectcar.connect"
+        // A lab build (tool/sound_lab.dart) sets CONNECT_ID_SUFFIX=.lab so it installs beside
+        // the real app instead of over it; the real app's account lives only on the phone.
+        System.getenv("CONNECT_ID_SUFFIX")?.takeIf { it.isNotBlank() }?.let { applicationIdSuffix = it }
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

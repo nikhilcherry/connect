@@ -234,6 +234,22 @@ class _AlertThreadScreenState extends State<AlertThreadScreen> {
           child: ListView(controller: _scroll, padding: const EdgeInsets.fromLTRB(20, 8, 20, 16), children: [
             Center(child: Label('${tr('Someone at your car')} · ${DateFormat('d MMM, h:mm a').format(alert.createdAt)}')),
             const SizedBox(height: 16),
+            if (alert.viaSound)
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(color: Tone.info.bg, borderRadius: BorderRadius.circular(DL.rCard)),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Icon(Icons.graphic_eq, color: Tone.info.fg, size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      tr('Carried here by sound. The person at your car had no signal, so a nearby phone passed this on. They may not see a reply.'),
+                      style: DLText.body.copyWith(color: Tone.info.fg, height: 1.5),
+                    ),
+                  ),
+                ]),
+              ),
             if (alert.photoPath != null) Reveal(child: _AlertPhoto(path: alert.photoPath!)),
             if (alert.kind == AlertKind.accident)
               Container(

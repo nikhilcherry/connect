@@ -18,7 +18,7 @@ class AlertsTab extends StatelessWidget {
 
     return SafeArea(
       child: RefreshIndicator(
-        onRefresh: s.refresh,
+        onRefresh: s.reload,
         child: ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 32), children: [
           Reveal(child: ScreenTitle(tr('Alerts'), eyebrow: tr('{n} open', {'n': s.openAlerts}))),
           const SizedBox(height: 24),

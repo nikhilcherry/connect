@@ -269,7 +269,7 @@ class _SocietyScreenState extends State<SocietyScreen> {
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
-            await s.refresh();
+            await s.reload();
             await _load();
           },
           child: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 32), children: [

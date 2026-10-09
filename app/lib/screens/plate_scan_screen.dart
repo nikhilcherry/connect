@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../config.dart';
+import '../data/app_state.dart';
 import '../l10n.dart';
 import '../main.dart';
 import '../services/plate_reader.dart';
@@ -15,6 +16,7 @@ import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/motion.dart';
 import 'live_plate_screen.dart';
+import 'whisper_screen.dart';
 
 enum _Phase { idle, reading, ready, searching, notFound }
 
@@ -36,6 +38,7 @@ class _PlateScanScreenState extends State<PlateScanScreen> {
   String? _code; // tag code once the car is found
   Situation? _situation;
   bool _analysing = false;
+  bool _noSignal = false; // the lookup could not reach the server
 
   @override
   void dispose() {
@@ -93,6 +96,7 @@ class _PlateScanScreenState extends State<PlateScanScreen> {
     setState(() {
       _phase = _Phase.searching;
       _error = null;
+      _noSignal = false;
     });
     try {
       final code = await AppScope.read(context).findTagByPlate(plate);
@@ -106,10 +110,14 @@ class _PlateScanScreenState extends State<PlateScanScreen> {
         _code = code;
       });
     } catch (e) {
-      if (mounted) {
-        setState(() => _phase = _Phase.ready);
-        showError(context, e);
-      }
+      if (!mounted) return;
+      // With no signal the lookup cannot happen, but the message still can: by sound.
+      final noSignal = AppState.isNetworkError(e);
+      setState(() {
+        _phase = _Phase.ready;
+        _noSignal = noSignal;
+      });
+      if (!noSignal) showError(context, e);
     }
   }
 
@@ -185,6 +193,7 @@ class _PlateScanScreenState extends State<PlateScanScreen> {
             onChanged: (_) => setState(() {
               // a different plate than the one that was looked up: drop its result
               _error = null;
+              _noSignal = false;
               _code = null;
               _situation = null;
               if (_phase == _Phase.notFound) _phase = _Phase.ready;
@@ -210,6 +219,22 @@ class _PlateScanScreenState extends State<PlateScanScreen> {
             onPressed: busy ? null : _find,
             child: Text(_phase == _Phase.searching ? tr('Looking…') : tr('Find this car on Connect')),
           ),
+          if (_noSignal) ...[
+            const SizedBox(height: 16),
+            SectionCard(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Label(tr('No signal here')),
+                const SizedBox(height: 8),
+                Text(tr('Connect can\'t be reached from here, so the car can\'t be looked up. Your phone can still pass the message on by sound.'), style: DLText.body),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: () => push(context, WhisperScreen(plate: _plate.text.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), ''))),
+                  icon: const Icon(Icons.graphic_eq),
+                  label: Text(tr('Say it with sound')),
+                ),
+              ]),
+            ),
+          ],
           if (_phase == _Phase.notFound) ...[
             const SizedBox(height: 16),
             SectionCard(
