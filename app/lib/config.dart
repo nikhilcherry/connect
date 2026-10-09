@@ -7,11 +7,11 @@ import 'package:flutter/foundation.dart';
 class Config {
   static const supabaseUrl = String.fromEnvironment(
     'SUPABASE_URL',
-    defaultValue: 'https://connect-api.premortem.tech',
+    defaultValue: 'https://pbysiqjwfptmyfbjhhao.supabase.co',
   );
   static const supabaseAnonKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',
-    defaultValue: 'sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH',
+    defaultValue: 'sb_publishable_c-iJBGAcj_oEXNWc1z9Atw_OhlNpPVx',
   );
 
   /// Where the QR on a tag points. Printed stickers can't be changed, so this
