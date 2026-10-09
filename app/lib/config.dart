@@ -19,10 +19,10 @@ class Config {
   /// it with --dart-define=SCAN_BASE_URL=http://127.0.0.1:8093.
   static const scanBaseUrl = String.fromEnvironment(
     'SCAN_BASE_URL',
-    defaultValue: 'https://connect.example.com',
+    defaultValue: 'https://connect.premortem.tech',
   );
 
-  /// e.g. https://connect.example.com/t/EE5WRD6P. The short path keeps the
+  /// e.g. https://connect.premortem.tech/t/EE5WRD6P. The short path keeps the
   /// QR sparse enough to scan through a windshield; the host rewrites /t/* to
   /// the scan page (web/vercel.json, web/serve.py).
   static String tagUrl(String code) => '$scanBaseUrl/t/$code';
@@ -45,5 +45,5 @@ class Config {
       !kIsWeb && firebaseApiKey.isNotEmpty && firebaseAppId.isNotEmpty && firebaseSenderId.isNotEmpty && firebaseProjectId.isNotEmpty;
 
   /// Where "Protect a friend's car" sends people.
-  static const appUrl = String.fromEnvironment('APP_URL', defaultValue: 'https://connect.example.com/get');
+  static const appUrl = String.fromEnvironment('APP_URL', defaultValue: 'https://connect.premortem.tech/get');
 }
