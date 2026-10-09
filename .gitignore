@@ -18,3 +18,6 @@ ml/*.pt
 ml/weights/*.onnx
 
 __pycache__/
+app/build/
+app/.dart_tool/
+.gradle/

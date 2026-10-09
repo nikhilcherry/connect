@@ -93,8 +93,8 @@ void main() {
     });
   });
 
-  test('printed tags point at connect.example.com/t/CODE', () {
+  test('printed tags point at connect.premortem.tech/t/CODE', () {
     // Run without --dart-define=SCAN_BASE_URL, as release builds are.
-    expect(Config.tagUrl('EE5WRD6P'), 'https://connect.example.com/t/EE5WRD6P');
+    expect(Config.tagUrl('EE5WRD6P'), 'https://connect.premortem.tech/t/EE5WRD6P');
   });
 }

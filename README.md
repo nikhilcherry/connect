@@ -142,7 +142,7 @@ flutter build apk --debug                                                # emula
 The repo ships with placeholders, not a live backend:
 
 - `web/config.js`: set `supabaseUrl` and `anonKey` (the publishable key is public by design).
-- `app/lib/config.dart`: `scanBaseUrl` and `appUrl` default to `connect.example.com`; pass `--dart-define=SCAN_BASE_URL=...` or change the defaults to your domain. Printed QR stickers can't be changed, so pick the domain before printing.
+- `app/lib/config.dart`: `scanBaseUrl` and `appUrl` default to `connect.premortem.tech`; pass `--dart-define=SCAN_BASE_URL=...` or change the defaults to your domain. Printed QR stickers can't be changed, so pick the domain before printing.
 
 ```bash
 supabase link --project-ref <your-project-ref>
