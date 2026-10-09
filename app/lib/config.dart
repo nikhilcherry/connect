@@ -5,12 +5,9 @@
 import 'package:flutter/foundation.dart';
 
 class Config {
-  // The Android emulator reaches the host machine at 10.0.2.2.
-  static const _localHost = kIsWeb ? '127.0.0.1' : '10.0.2.2';
-
   static const supabaseUrl = String.fromEnvironment(
     'SUPABASE_URL',
-    defaultValue: 'http://$_localHost:54321',
+    defaultValue: 'https://connect-api.premortem.tech',
   );
   static const supabaseAnonKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',

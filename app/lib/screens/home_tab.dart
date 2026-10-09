@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../data/app_state.dart';
 import '../data/models.dart';
 import '../l10n.dart';
 import '../main.dart';
@@ -12,7 +15,7 @@ import 'family_screen.dart';
 import 'garage_tab.dart';
 import 'home_shell.dart';
 import 'parking_screen.dart';
-import 'safety_tab.dart' show TripBanner;
+import 'safety_tab.dart' show TripBanner, sendSos;
 import 'society_screen.dart';
 import 'tag_screen.dart';
 
@@ -34,10 +37,22 @@ class HomeTab extends StatelessWidget {
       child: RefreshIndicator(
         onRefresh: s.reload,
         child: ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 32), children: revealAll([
-          ScreenTitle(
-            v.title,
-            eyebrow: s.isOwner ? 'Connect' : tr('Shared with you'),
-            subtitle: [v.prettyReg, if (v.colour != null) tr(v.colour!)].join(' · '),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: ScreenTitle(
+                  v.title,
+                  eyebrow: s.isOwner ? 'Connect' : tr('Shared with you'),
+                  subtitle: [v.prettyReg, if (v.colour != null) tr(v.colour!)].join(' · '),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: _SosButton(onTap: () => _showEmergencySheet(context, s)),
+              ),
+            ],
           ),
           const SizedBox(height: 24),
 
@@ -214,4 +229,173 @@ class _RenewalsCard extends StatelessWidget {
       ]),
     );
   }
+}
+
+class _SosButton extends StatelessWidget {
+  const _SosButton({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'SOS',
+      child: Pressable(
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: onTap,
+            customBorder: const CircleBorder(),
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: DL.error,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: DL.error.withValues(alpha: 0.35),
+                    offset: const Offset(0, 4),
+                    blurRadius: 10,
+                  ),
+                ],
+                border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1.5),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                'SOS',
+                style: DLText.label.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.2,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+void _showEmergencySheet(BuildContext context, AppState s) {
+  HapticFeedback.mediumImpact();
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: DL.card,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(DL.rSheet)),
+    ),
+    builder: (sheetContext) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: DL.lineStrong,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                const IconBadge(Icons.call_outlined, tone: Tone.error, size: 40),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(tr('Emergency contacts'), style: DLText.section),
+                      const SizedBox(height: 2),
+                      Text(
+                        tr('Police, fire, ambulance'),
+                        style: DLText.small,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            SectionCard(
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                launchUrl(Uri.parse('tel:112'));
+              },
+              child: Row(
+                children: [
+                  const IconBadge(Icons.call_outlined, tone: Tone.error, size: 44),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(tr('Call 112'), style: DLText.strong.copyWith(color: DL.error)),
+                        const SizedBox(height: 2),
+                        Text(
+                          tr('Police, fire, ambulance'),
+                          style: DLText.small,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios, size: 14, color: DL.muted),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            SectionCard(
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                if (s.contacts.isEmpty) {
+                  HomeShell.goTo(context, 2);
+                } else {
+                  sendSos(context, s.contacts);
+                }
+              },
+              child: Row(
+                children: [
+                  IconBadge(
+                    Icons.sms_outlined,
+                    tone: s.contacts.isNotEmpty ? Tone.warning : Tone.neutral,
+                    size: 44,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(tr('Send SOS'), style: DLText.strong),
+                        const SizedBox(height: 2),
+                        Text(
+                          s.contacts.isEmpty
+                              ? tr('Add a contact first')
+                              : tr('Text your location'),
+                          style: DLText.small,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios, size: 14, color: DL.muted),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton(
+              onPressed: () => Navigator.of(sheetContext).pop(),
+              child: Text(tr('Cancel')),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
