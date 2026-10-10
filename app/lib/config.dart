@@ -5,16 +5,13 @@
 import 'package:flutter/foundation.dart';
 
 class Config {
-  // The Android emulator reaches the host machine at 10.0.2.2.
-  static const _localHost = kIsWeb ? '127.0.0.1' : '10.0.2.2';
-
   static const supabaseUrl = String.fromEnvironment(
     'SUPABASE_URL',
-    defaultValue: 'http://$_localHost:54321',
+    defaultValue: 'https://pbysiqjwfptmyfbjhhao.supabase.co',
   );
   static const supabaseAnonKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',
-    defaultValue: 'sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH',
+    defaultValue: 'sb_publishable_c-iJBGAcj_oEXNWc1z9Atw_OhlNpPVx',
   );
 
   /// The name supabase_flutter files the signed-in session under: it is taken
@@ -26,10 +23,10 @@ class Config {
   /// it with --dart-define=SCAN_BASE_URL=http://127.0.0.1:8093.
   static const scanBaseUrl = String.fromEnvironment(
     'SCAN_BASE_URL',
-    defaultValue: 'https://connect.example.com',
+    defaultValue: 'https://connect.premortem.tech',
   );
 
-  /// e.g. https://connect.example.com/t/EE5WRD6P. The short path keeps the
+  /// e.g. https://connect.premortem.tech/t/EE5WRD6P. The short path keeps the
   /// QR sparse enough to scan through a windshield; the host rewrites /t/* to
   /// the scan page (web/vercel.json, web/serve.py).
   static String tagUrl(String code) => '$scanBaseUrl/t/$code';
@@ -52,5 +49,5 @@ class Config {
       !kIsWeb && firebaseApiKey.isNotEmpty && firebaseAppId.isNotEmpty && firebaseSenderId.isNotEmpty && firebaseProjectId.isNotEmpty;
 
   /// Where "Protect a friend's car" sends people.
-  static const appUrl = String.fromEnvironment('APP_URL', defaultValue: 'https://connect.example.com/get');
+  static const appUrl = String.fromEnvironment('APP_URL', defaultValue: 'https://connect.premortem.tech/get');
 }
