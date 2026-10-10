@@ -9,6 +9,17 @@ android {
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
+    // RoadGuard: on-device road scan (ncnn + Vulkan). Prebuilt ncnn lives in android/third_party,
+    // fetched by tool/get_ncnn.sh.
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+    // Model files must stay uncompressed so ncnn can read them straight from the APK.
+    androidResources { noCompress += listOf("bin", "param") }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -27,6 +38,16 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        externalNativeBuild {
+            cmake {
+                cppFlags += "-std=c++17"
+                abiFilters += listOf("arm64-v8a", "x86_64")
+                arguments += listOf(
+                    "-DANDROID_STL=c++_shared",
+                    "-DNCNN_ROOT=" + file("../third_party/ncnn-20260526-android-vulkan").absolutePath.replace("\\", "/"),
+                )
+            }
+        }
     }
 
     buildTypes {
@@ -57,4 +78,14 @@ configurations.all {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    // RoadGuard road scan
+    val camerax = "1.4.2"
+    implementation("androidx.camera:camera-core:$camerax")
+    implementation("androidx.camera:camera-camera2:$camerax")
+    implementation("androidx.camera:camera-lifecycle:$camerax")
+    implementation("androidx.camera:camera-view:$camerax")
+    implementation("androidx.lifecycle:lifecycle-service:2.8.7")
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+    implementation("com.google.android.gms:play-services-tasks:18.4.1")
 }

@@ -1,8 +1,14 @@
 package app.connectcar.connect
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
+import android.os.Build
 import android.view.WindowManager
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import com.iqoo.roadguard.RoadGuardBridge
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -17,8 +23,65 @@ class MainActivity : FlutterActivity() {
         AudioDeviceInfo.TYPE_HDMI, AudioDeviceInfo.TYPE_LINE_ANALOG,
     )
 
+    // Drive Mode's road scan (potholes, triple riding, no helmet). Everything runs on the phone.
+    private var pendingRoadStart: MethodChannel.Result? = null
+    private var pendingRoadDemoDir: String? = null
+
+    private fun roadPermissions(): List<String> = buildList {
+        add(Manifest.permission.CAMERA)
+        add(Manifest.permission.ACCESS_FINE_LOCATION)
+        if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    private fun startRoadScan(demoDir: String?, result: MethodChannel.Result) {
+        if (!RoadGuardBridge.available()) {
+            result.success(false)
+            return
+        }
+        val missing = roadPermissions().filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
+        if (missing.isEmpty()) {
+            result.success(RoadGuardBridge.start(this, demoDir))
+            return
+        }
+        if (pendingRoadStart != null) {
+            result.success(false)
+            return
+        }
+        pendingRoadStart = result
+        pendingRoadDemoDir = demoDir
+        ActivityCompat.requestPermissions(this, missing.toTypedArray(), ROAD_PERMISSION_REQUEST)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != ROAD_PERMISSION_REQUEST) return
+        val r = pendingRoadStart ?: return
+        pendingRoadStart = null
+        // Camera is required; location (for map pins) and notifications are optional.
+        val cameraOk = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        r.success(cameraOk && RoadGuardBridge.start(this, pendingRoadDemoDir))
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "connect/roadguard").setMethodCallHandler { call, result ->
+            try {
+                when (call.method) {
+                    "available" -> result.success(RoadGuardBridge.available())
+                    "start" -> startRoadScan(call.argument<String>("demoDir"), result)
+                    "preview" -> result.success(RoadGuardBridge.preview())
+                    "stop" -> {
+                        RoadGuardBridge.stop(this)
+                        result.success(null)
+                    }
+                    "status" -> result.success(RoadGuardBridge.status())
+                    "events" -> result.success(RoadGuardBridge.events(this, (call.arguments as? Number)?.toLong() ?: 0L))
+                    else -> result.notImplemented()
+                }
+            } catch (e: Exception) {
+                result.error("roadguard", e.message, null)
+            }
+        }
         val audio = getSystemService(AudioManager::class.java)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "connect/device").setMethodCallHandler { call, result ->
             try {
@@ -54,5 +117,9 @@ class MainActivity : FlutterActivity() {
                 result.error("device", e.message, null)
             }
         }
+    }
+
+    companion object {
+        private const val ROAD_PERMISSION_REQUEST = 7710
     }
 }
