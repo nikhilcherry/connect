@@ -60,6 +60,26 @@ void main() {
     });
   });
 
+  group('anonymous ids', () {
+    setUp(() => SharedPreferences.setMockInitialValues({}));
+
+    test('stable for one event, different for another, and not derived from the local id', () async {
+      final r = ViolationReporter(url: 'http://127.0.0.1:1/x');
+      final a = await r.anonymousId('no_helmet_00001');
+      expect(await r.anonymousId('no_helmet_00001'), a);
+      expect(await r.anonymousId('no_helmet_00002'), isNot(a));
+      expect(a, isNot(contains('00001')));
+      expect(a, hasLength(24));
+    });
+
+    test('a different phone (a different secret) gives a different id for the same local id', () async {
+      final r = ViolationReporter(url: 'http://127.0.0.1:1/x');
+      final a = await r.anonymousId('no_helmet_00001');
+      SharedPreferences.setMockInitialValues({});
+      expect(await r.anonymousId('no_helmet_00001'), isNot(a));
+    });
+  });
+
   group('what is sent', () {
     test('the fields carry the plate, the time and the coordinates', () {
       final f = ViolationReporter.fieldsFor(_event());
@@ -73,7 +93,7 @@ void main() {
       expect(unread['plate_clear'], 'false');
       expect(unread['plate_number'], '');
       expect(f['authorised'], 'true');
-      expect(f['timestamp'], '2026-10-10T09:30:15.000Z');
+      expect(f['timestamp'], '2026-10-10T09:30:15Z');
     });
 
     test('the body is a multipart form with the text fields and both photos', () {
@@ -102,7 +122,7 @@ void main() {
       server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       server.listen((req) async {
         final bytes = await req.fold<List<int>>(<int>[], (a, b) => a..addAll(b));
-        received.add({'key': req.headers.value('x-api-key') ?? '', 'method': req.method, 'path': req.uri.path, 'type': req.headers.contentType.toString(), 'body': latin1.decode(bytes)});
+        received.add({'ua': req.headers.value('user-agent') ?? '', 'key': req.headers.value('x-api-key') ?? '', 'method': req.method, 'path': req.uri.path, 'type': req.headers.contentType.toString(), 'body': latin1.decode(bytes)});
         req.response.statusCode = status;
         await req.response.close();
       });
@@ -141,6 +161,19 @@ void main() {
       expect(body, contains('name="latitude"\r\n\r\n12.9716'));
       expect(body, contains('name="frame"; filename="frame.jpg"'));
       expect(body, isNot(contains('name="plate"; filename')));
+    });
+
+    test('the report is anonymous: no local id, no device clock detail, no runtime in the user agent', () async {
+      expect((await reporter().report(event())).ok, isTrue);
+      final got = received.single;
+      final body = got['body'] as String;
+      expect(body, isNot(contains('no_helmet_00001')));
+      expect(body, isNot(contains('connect-1'))); // the boundary is random, not the phone's clock
+      expect(got['ua'], 'connect-report');
+      final m = RegExp('name="event_id"\r\n\r\n([0-9a-f]+)\r\n').firstMatch(body);
+      expect(m, isNotNull);
+      expect(m!.group(1), hasLength(24));
+      expect(body, contains('name="timestamp"\r\n\r\n2026-10-10T09:30:15Z'));
     });
 
     test('the key is sent as X-Api-Key when one is configured, and not otherwise', () async {

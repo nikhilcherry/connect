@@ -9,7 +9,7 @@ this is the technical layer that agreement would rest on.
 
 | Step | What happens |
 | --- | --- |
-| Receive | Accepts the app's `multipart/form-data` report (frame, optional plate and vehicle photos, coordinates, time, plate text). Optional `X-Api-Key` check. |
+| Receive | Accepts the app's `multipart/form-data` report (frame, optional plate and vehicle photos, coordinates, time, plate text). Optional `X-Api-Key` check. Reports are **anonymous**: no name, account or device id arrives, the event id is a one-way hash, and this server neither logs nor stores the caller's address. |
 | Fingerprint | SHA-256 of every photo, and an HMAC signature over the whole record. Changing a photo or the record afterwards is detected. |
 | De-duplicate | Same plate and violation within 10 minutes is flagged as a possible duplicate. An unread plate is never matched. Retries from the app are idempotent. |
 | Review | A reviewer signs in, checks the photos, corrects the plate if needed, approves or rejects, and leaves a note. Every action is written to a history. |
@@ -42,6 +42,9 @@ Tests: `python -m unittest test_verifier` (21 tests, no network, standard librar
 - **HTTPS and hosting.** It speaks plain HTTP and binds to `127.0.0.1`. Put it behind a TLS terminator
   (a reverse proxy) before exposing it; do not expose it as it is.
 - **Reviewers.** There is one shared login. Real use needs individual accounts and roles.
+- **Anonymous, but not untraceable.** The report carries nothing that names the reporter, but the network
+  can still see who connected: the hosting provider, or any proxy in front of this server, sees the caller's
+  address. Where the evidence was taken (the coordinates) and when also show that someone was there.
 - **Privacy.** Reports hold photos of other people's vehicles and plates, and the reporter's location.
   Decide the retention period, who may see them and why, and consent for the reporter (India's DPDP Act
   applies). Run `--purge-days` on a schedule.

@@ -152,7 +152,15 @@ Potholes are never reported this way, and each violation can be reported once.
 | `plate_number`, `plate_clear` | the plate text (empty if it was not read) and `true` or `false` |
 | `violation` | `triple_riding` or `no_helmet` |
 | `timestamp` | when, in UTC (ISO 8601) |
-| `event_id`, `authorised`, `source`, `note` | the event, `true`, `connect-drive-mode`, and how it was decided |
+| `event_id`, `authorised`, `source`, `note` | an anonymous event id, `true`, `connect-drive-mode`, and how it was decided |
+
+**Anonymous.** A report carries no name, account, phone number or device id. The event id is a one-way hash
+of the on-phone id and a random secret kept only on the phone, so reports from one phone cannot be linked
+by it and it does not reveal how many were made. The time is to the second, the multipart boundary is
+random, the user agent is a plain `connect-report`, and the photos carry no metadata. What remains is what
+the report is for: the place and time of the violation, the photos of the vehicle and its riders, and the
+plate text. The network can still see the sender's address, so the receiving service should not log it
+(the console in `verifier/` does not).
 
 **Setup.** Reporting is hidden unless the build is given an address. Keep the real address out of the
 repository:

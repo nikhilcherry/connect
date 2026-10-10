@@ -366,7 +366,8 @@ class Handler(BaseHTTPRequestHandler):
     cfg: Config = None
 
     def log_message(self, fmt, *a):
-        sys.stderr.write("%s %s\n" % (self.address_string(), fmt % a))
+        # Reports are anonymous, so the caller's address is not logged (or stored) here.
+        sys.stderr.write("%s\n" % (fmt % a))
 
     # responses
     def send(self, code, body=b"", ctype="text/html; charset=utf-8", headers=None):

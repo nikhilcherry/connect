@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' show Random;
 import 'dart:typed_data' show BytesBuilder;
 
+import 'package:crypto/crypto.dart' show sha256;
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -49,6 +51,28 @@ class ViolationReporter {
   final Duration timeout;
 
   static const _prefReported = 'reported_violations';
+  static const _prefSalt = 'report_anon_salt';
+
+  /// What identifies the event to the reporting service. Reports are anonymous: the id is a one-way hash of
+  /// the local id and a random secret kept only on this phone, so it is the same on a retry but cannot be
+  /// linked to other reports from this phone, and does not reveal how many there are.
+  @visibleForTesting
+  Future<String> anonymousId(String localId) async {
+    String salt;
+    try {
+      final p = await SharedPreferences.getInstance();
+      var saved = p.getString(_prefSalt);
+      if (saved == null) {
+        final r = Random.secure();
+        saved = List.generate(32, (_) => r.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+        await p.setString(_prefSalt, saved);
+      }
+      salt = saved;
+    } catch (_) {
+      salt = 'volatile-${Random.secure().nextInt(1 << 31)}'; // storage unavailable: still unlinkable
+    }
+    return sha256.convert(utf8.encode('$salt|$localId')).toString().substring(0, 24);
+  }
 
   bool get configured => url != null;
 
@@ -96,10 +120,14 @@ class ViolationReporter {
 
   /// The text fields of a report. Kept in one place so the webhook's workflow can rely on them.
   @visibleForTesting
-  static Map<String, String> fieldsFor(RoadEvent e) => {
-        'event_id': e.id,
+  static Map<String, String> fieldsFor(RoadEvent e, {String? eventId}) => {
+        'event_id': eventId ?? e.id,
         'violation': e.type, // triple_riding | no_helmet
-        'timestamp': e.time.toUtc().toIso8601String(),
+        // To the second: more detail than that identifies nothing useful.
+        'timestamp': DateTime.utc(e.time.toUtc().year, e.time.toUtc().month, e.time.toUtc().day, e.time.toUtc().hour,
+                e.time.toUtc().minute, e.time.toUtc().second)
+            .toIso8601String()
+            .replaceFirst('.000', ''),
         'latitude': e.lat!.toString(),
         'longitude': e.lon!.toString(),
         'plate_number': e.plateText,
@@ -122,14 +150,17 @@ class ViolationReporter {
     // The plate crop only exists when a plate was found; a report without one is still sent.
     final plate = e.platePath == null ? null : File(e.platePath!);
 
-    final boundary = '----connect-${DateTime.now().microsecondsSinceEpoch}';
+    final boundary = '----connect-${Random.secure().nextInt(1 << 31).toRadixString(16)}${Random.secure().nextInt(1 << 31).toRadixString(16)}';
     final files = <String, List<int>>{'frame': await frame.readAsBytes()};
     if (plate != null && await plate.exists()) files['plate'] = await plate.readAsBytes();
     // The vehicle at full detail, when a full-resolution still was taken.
     final vehicle = e.vehiclePath == null ? null : File(e.vehiclePath!);
     if (vehicle != null && await vehicle.exists()) files['vehicle'] = await vehicle.readAsBytes();
-    final body = buildBody(boundary, fieldsFor(e), files);
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 15);
+    final body = buildBody(boundary, fieldsFor(e, eventId: await anonymousId(e.id)), files);
+    // A plain user agent, so the request does not say which runtime or version the app uses.
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 15)
+      ..userAgent = 'connect-report';
     try {
       final req = await client.postUrl(target);
       req.headers.set(HttpHeaders.contentTypeHeader, 'multipart/form-data; boundary=$boundary');

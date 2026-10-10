@@ -1,4 +1,5 @@
 import base64
+import contextlib
 import io
 import json
 import tempfile
@@ -132,6 +133,18 @@ class Ingest(Base):
         self.received(plate_number="")
         b = self.received(event_id="x2", plate_number="", timestamp="2026-10-10T09:31:00.000Z")
         self.assertIsNone(self.store.get(b)["dup_of"])
+
+
+class Anonymity(Base):
+    def test_the_callers_address_is_not_logged_or_stored(self):
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            self.received()
+            self.req("GET", "/")
+        self.assertNotIn("127.0.0.1", err.getvalue())
+        self.assertIn("POST /webhook/traffic-violation", err.getvalue())
+        cols = [c[1] for c in self.store.db.execute("PRAGMA table_info(reports)")]
+        self.assertEqual([c for c in cols if c in ("ip", "addr", "remote", "device", "user_agent")], [])
 
 
 class ApiKey(Base):
