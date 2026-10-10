@@ -12,6 +12,7 @@ import 'screens/alert_thread.dart';
 import 'screens/home_shell.dart';
 import 'screens/onboarding.dart';
 import 'screens/society_screen.dart';
+import 'services/roadguard.dart';
 import 'services/garage_log.dart';
 import 'services/notifications.dart';
 import 'services/parking.dart';
@@ -51,7 +52,7 @@ Future<void> main() async {
     debugPrint('session not carried over: $e');
   }
   await Supabase.initialize(url: Config.supabaseUrl, publishableKey: Config.supabaseAnonKey);
-  await Future.wait([L10n.load(), Notifications.init(), ParkingStore.load(), GarageLog.load(), Wallet.load(), WhisperStore.load(), WitnessLog.load()]);
+  await Future.wait([L10n.load(), RoadGuard.load(), Notifications.init(), ParkingStore.load(), GarageLog.load(), Wallet.load(), WhisperStore.load(), WitnessLog.load()]);
   final state = AppState(Supabase.instance.client)..bootstrap();
   unawaited(Push.init(state));
   unawaited(TripShare.resume(state));

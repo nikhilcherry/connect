@@ -38,7 +38,7 @@ A QR tag on the windshield turns "whose car is this?" into a private two-way cha
 | --- | --- |
 | **Home** | Alerts that need a reply, stat cards (open alerts, days to next renewal, family), the tag, "back by" status, where-did-I-park, society notices, live-trip banner |
 | **Alerts** | Every conversation, photo attachments, block-and-report |
-| **Safety** | Drive Mode crash detection with a 15-second cancel countdown, Witness mode for a parked car, one-tap 112 and SOS to contacts, live trip sharing, medical info |
+| **Safety** | Drive Mode crash detection with a 15-second cancel countdown and an on-device road scan for potholes, triple riding and riders without helmets (see [docs/road-scan.md](docs/road-scan.md)), Witness mode for a parked car, one-tap 112 and SOS to contacts, live trip sharing, medical info |
 | **Garage** | Fuel and expenses with mileage, service history PDF, document photos, renewals, reach a car by its plate, say it with sound, damage check, challan check, family, society, Fit Check, tag settings, language |
 
 

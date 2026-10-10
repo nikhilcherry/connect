@@ -13,6 +13,8 @@
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- Drive Mode road scan runs the camera in a foreground service with a visible notification. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA"/>
     <application
         android:label="Connect"
         android:name="${applicationName}"
@@ -44,6 +46,10 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <service
+            android:name="com.iqoo.roadguard.DetectionService"
+            android:exported="false"
+            android:foregroundServiceType="camera|location"/>
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"/>
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
             <intent-filter>
