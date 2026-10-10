@@ -1,0 +1,3 @@
+# ncnn model files: text graph with LF endings, weights are binary.
+*.param text eol=lf
+*.bin binary
