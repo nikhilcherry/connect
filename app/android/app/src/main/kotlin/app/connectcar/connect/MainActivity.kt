@@ -1,7 +1,10 @@
 package app.connectcar.connect
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.DocumentsContract
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.os.Build
@@ -27,6 +30,8 @@ class MainActivity : FlutterActivity() {
     private var pendingRoadStart: MethodChannel.Result? = null
     private var pendingRoadDemoDir: String? = null
     private var pendingRoadAi = false
+    private var pendingRoadVideos: List<String>? = null
+    private var pendingPick: MethodChannel.Result? = null
 
     private fun roadPermissions(): List<String> = buildList {
         add(Manifest.permission.CAMERA)
@@ -34,14 +39,14 @@ class MainActivity : FlutterActivity() {
         if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.POST_NOTIFICATIONS)
     }
 
-    private fun startRoadScan(demoDir: String?, ai: Boolean, result: MethodChannel.Result) {
+    private fun startRoadScan(demoDir: String?, ai: Boolean, videos: List<String>?, result: MethodChannel.Result) {
         if (!RoadGuardBridge.available()) {
             result.success(false)
             return
         }
         val missing = roadPermissions().filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isEmpty()) {
-            result.success(RoadGuardBridge.start(this, demoDir, ai))
+            result.success(RoadGuardBridge.start(this, demoDir, ai, videos))
             return
         }
         if (pendingRoadStart != null) {
@@ -51,6 +56,7 @@ class MainActivity : FlutterActivity() {
         pendingRoadStart = result
         pendingRoadDemoDir = demoDir
         pendingRoadAi = ai
+        pendingRoadVideos = videos
         ActivityCompat.requestPermissions(this, missing.toTypedArray(), ROAD_PERMISSION_REQUEST)
     }
 
@@ -61,7 +67,83 @@ class MainActivity : FlutterActivity() {
         pendingRoadStart = null
         // Camera is required; location (for map pins) and notifications are optional.
         val cameraOk = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        r.success(cameraOk && RoadGuardBridge.start(this, pendingRoadDemoDir, pendingRoadAi))
+        r.success(cameraOk && RoadGuardBridge.start(this, pendingRoadDemoDir, pendingRoadAi, pendingRoadVideos))
+    }
+
+    /** Opens the system picker for dashcam footage: several clips, or a whole folder. Answers with the clips' URIs. */
+    private fun pick(result: MethodChannel.Result, folder: Boolean) {
+        if (pendingPick != null) {
+            result.success(emptyList<String>())
+            return
+        }
+        pendingPick = result
+        val intent = if (folder) {
+            Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+        } else {
+            Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("video/*").putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        }
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+        startActivityForResult(intent, if (folder) PICK_FOLDER_REQUEST else PICK_VIDEOS_REQUEST)
+    }
+
+    private fun keep(uri: Uri) {
+        try {
+            contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        } catch (_: Exception) {
+        }
+    }
+
+    private val videoExt = setOf("mp4", "mov", "mkv", "ts", "avi", "3gp", "m4v")
+
+    /** Video files inside a picked folder (and its sub-folders, a few levels down), oldest name first. */
+    private fun videosIn(tree: Uri): List<String> {
+        val out = ArrayList<Pair<String, String>>()
+        fun walk(docId: String, depth: Int) {
+            val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, docId)
+            contentResolver.query(
+                children,
+                arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE),
+                null, null, null,
+            )?.use { c ->
+                while (c.moveToNext() && out.size < 500) {
+                    val id = c.getString(0)
+                    val name = c.getString(1) ?: continue
+                    val mime = c.getString(2) ?: ""
+                    if (mime == DocumentsContract.Document.MIME_TYPE_DIR) {
+                        if (depth < 3) walk(id, depth + 1)
+                    } else if (mime.startsWith("video/") || name.substringAfterLast('.', "").lowercase() in videoExt) {
+                        out.add(name to DocumentsContract.buildDocumentUriUsingTree(tree, id).toString())
+                    }
+                }
+            }
+        }
+        walk(DocumentsContract.getTreeDocumentId(tree), 0)
+        return out.sortedBy { it.first }.map { it.second }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode != PICK_VIDEOS_REQUEST && requestCode != PICK_FOLDER_REQUEST) {
+            @Suppress("DEPRECATION")
+            super.onActivityResult(requestCode, resultCode, data)
+            return
+        }
+        val r = pendingPick ?: return
+        pendingPick = null
+        val list = ArrayList<String>()
+        try {
+            if (resultCode == RESULT_OK && data != null) {
+                if (requestCode == PICK_FOLDER_REQUEST) {
+                    data.data?.let { keep(it); list.addAll(videosIn(it)) }
+                } else {
+                    val clip = data.clipData
+                    if (clip != null) for (i in 0 until clip.itemCount) clip.getItemAt(i).uri?.let { keep(it); list.add(it.toString()) }
+                    else data.data?.let { keep(it); list.add(it.toString()) }
+                }
+            }
+        } catch (_: Exception) {
+        }
+        r.success(list)
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -70,7 +152,9 @@ class MainActivity : FlutterActivity() {
             try {
                 when (call.method) {
                     "available" -> result.success(RoadGuardBridge.available())
-                    "start" -> startRoadScan(call.argument<String>("demoDir"), call.argument<Boolean>("ai") == true, result)
+                    "start" -> startRoadScan(call.argument<String>("demoDir"), call.argument<Boolean>("ai") == true, call.argument<List<String>>("videos"), result)
+                    "pickVideos" -> pick(result, false)
+                    "pickVideoFolder" -> pick(result, true)
                     "aiAvailable" -> result.success(RoadGuardBridge.aiAvailable())
                     "preview" -> result.success(RoadGuardBridge.preview())
                     "stop" -> {
@@ -124,5 +208,7 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         private const val ROAD_PERMISSION_REQUEST = 7710
+        private const val PICK_VIDEOS_REQUEST = 7720
+        private const val PICK_FOLDER_REQUEST = 7721
     }
 }

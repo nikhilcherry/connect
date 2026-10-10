@@ -39,6 +39,10 @@ object Hub {
     @Volatile var fps = 0f
     @Volatile var skipped = 0L
 
+    /** While video clips stand in for the camera: which clip, and whether the last one has finished. */
+    @Volatile var video: VideoProgress? = null
+    @Volatile var videoDone = false
+
     val pipeline: Pipeline? get() = pipelineRef
 
     /** Counters at the moment a drive started, so the UI can show this drive only. */
@@ -60,6 +64,8 @@ object Hub {
         lastFrame = null
         demoActive = false
         stillSource = null
+        video = null
+        videoDone = false
         fps = 0f
     }
 

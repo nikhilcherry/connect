@@ -50,6 +50,31 @@ void main() {
       expect(ViolationReporter.check(_event(plateText: ''), configured: true), ReportBlock.none);
     });
 
+    test('footage from a clip with no recorded time cannot be reported, but one with a time can', () {
+      Map<Object?, Object?> clip({Object? occurred}) => {
+            'id': 'no_helmet_00005', 'type': 'no_helmet', 'timeMs': 1791606519570, 'framePath': 'f.jpg',
+            'plateText': '', 'imported': true, 'clip': '2023_1001_133850.MP4', 'lat': 12.9, 'lon': 77.5,
+            'occurredMs': ?occurred,
+          };
+      final unknown = RoadEvent.fromMap(clip());
+      expect(unknown.timeKnown, isFalse);
+      expect(ViolationReporter.check(unknown, configured: true), ReportBlock.noTime);
+      final known = RoadEvent.fromMap(clip(occurred: 1696167530000));
+      expect(known.timeKnown, isTrue);
+      // The time is the clip's own, not when it was scanned.
+      expect(known.time.toUtc(), DateTime.utc(2023, 10, 1, 13, 38, 50));
+      expect(ViolationReporter.check(known, configured: true), ReportBlock.none);
+    });
+
+    test('a clip with no place cannot be reported either, and camera events are unaffected', () {
+      final noPlace = RoadEvent.fromMap({'id': 'x', 'type': 'no_helmet', 'timeMs': 1, 'framePath': 'f', 'imported': true, 'occurredMs': 5});
+      expect(ViolationReporter.check(noPlace, configured: true), ReportBlock.noLocation);
+      final cam = RoadEvent.fromMap({'id': 'x', 'type': 'no_helmet', 'timeMs': 1791606519570, 'framePath': 'f', 'lat': 12.9, 'lon': 77.5});
+      expect(cam.imported, isFalse);
+      expect(cam.timeKnown, isTrue);
+      expect(ViolationReporter.check(cam, configured: true), ReportBlock.none);
+    });
+
     test('without a GPS fix there is no latitude and longitude to send', () {
       expect(ViolationReporter.check(_event(lat: null), configured: true), ReportBlock.noLocation);
       expect(ViolationReporter.check(_event(lon: null), configured: true), ReportBlock.noLocation);
@@ -168,7 +193,7 @@ void main() {
       final got = received.single;
       final body = got['body'] as String;
       expect(body, isNot(contains('no_helmet_00001')));
-      expect(body, isNot(contains('connect-1'))); // the boundary is random, not the phone's clock
+      expect(body, isNot(contains(RegExp(r'----connect-\d{16}(\r|-)')))); // random, not the phone's microsecond clock
       expect(got['ua'], 'connect-report');
       final m = RegExp('name="event_id"\r\n\r\n([0-9a-f]+)\r\n').firstMatch(body);
       expect(m, isNotNull);

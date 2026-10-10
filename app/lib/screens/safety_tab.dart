@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -26,14 +25,32 @@ import 'witness_screen.dart';
 class SafetyTab extends StatelessWidget {
   const SafetyTab({super.key});
 
-  /// Pick a video from the phone and run Drive Mode's road scan on it instead of the camera.
+  /// Choose dashcam footage (some clips, or a whole folder) and run Drive Mode's road scan on it instead of the
+  /// camera. Each event keeps the clip's own time and place.
   Future<void> _scanVideo(BuildContext context) async {
-    XFile? picked;
-    try {
-      picked = await ImagePicker().pickVideo(source: ImageSource.gallery);
-    } catch (_) {}
-    if (picked == null || !context.mounted) return;
-    RoadGuard.videoPath = picked.path;
+    final folder = await showModalBottomSheet<bool>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+            leading: const Icon(Icons.video_library_outlined),
+            title: Text(tr('Pick videos')),
+            subtitle: Text(tr('One or more clips')),
+            onTap: () => Navigator.of(ctx).pop(false),
+          ),
+          ListTile(
+            leading: const Icon(Icons.folder_open_outlined),
+            title: Text(tr('Pick a folder')),
+            subtitle: Text(tr('All the clips in a dashcam folder')),
+            onTap: () => Navigator.of(ctx).pop(true),
+          ),
+        ]),
+      ),
+    );
+    if (folder == null || !context.mounted) return;
+    final clips = folder ? await RoadGuard.pickVideoFolder() : await RoadGuard.pickVideos();
+    if (clips.isEmpty || !context.mounted) return;
+    RoadGuard.videos = clips;
     push(context, const DriveModeScreen());
   }
 
@@ -364,6 +381,7 @@ class _DriveModeScreenState extends State<DriveModeScreen> with SingleTickerProv
   Timer? _previewTimer;
   bool _previewBusy = false;
   Uint8List? _frame;
+  bool _finishing = false;
   // Not `late`: it must be stamped when Drive Mode opens, not when Stop first reads it.
   final DateTime _startedAt = DateTime.now();
 
@@ -402,6 +420,11 @@ class _DriveModeScreenState extends State<DriveModeScreen> with SingleTickerProv
     _roadTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
       final st = await RoadGuard.status();
       if (mounted && st != null) setState(() => _road = st);
+      // A batch of clips ends by itself: collect what it found and show the report.
+      if (mounted && st != null && st.videoDone && !_finishing) {
+        _finishing = true;
+        _stopDrive();
+      }
     });
     // The live view: a few frames a second, rendered natively only when asked for.
     _previewTimer = Timer.periodic(const Duration(milliseconds: 250), (_) async {
@@ -809,7 +832,9 @@ class _RoadPanel extends StatelessWidget {
               ? tr('Paused to cool the phone')
               : s.thermal >= 2
                   ? tr('Phone is warm: scanning slower')
-                  : tr('Scanning the road'),
+                  : s.videoCount > 0
+                      ? tr('Clip {i} of {n}: {name}', {'i': '${s.videoIndex}', 'n': '${s.videoCount}', 'name': s.videoClip})
+                      : tr('Scanning the road'),
     };
     final last = live ? _lastLabel(s.last) : null;
     return ConstrainedBox(
@@ -836,7 +861,7 @@ class _RoadPanel extends StatelessWidget {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             color: DL.error,
-                            child: Text(tr('Test feed, not the camera'), style: DLText.small.copyWith(color: DL.onDark, fontWeight: FontWeight.w700)),
+                            child: Text(s.videoCount > 0 ? tr('Footage from a video, not the camera') : tr('Test feed, not the camera'), style: DLText.small.copyWith(color: DL.onDark, fontWeight: FontWeight.w700)),
                           ),
                         ),
                     ]),

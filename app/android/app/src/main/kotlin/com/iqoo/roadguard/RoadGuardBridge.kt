@@ -36,10 +36,11 @@ object RoadGuardBridge {
     /** True when this build has an OpenRouter key, so the AI second opinion can be offered. */
     fun aiAvailable(): Boolean = BuildConfig.OPENROUTER_API_KEY.isNotBlank()
 
-    fun start(context: Context, demoDir: String? = null, ai: Boolean = false): Boolean {
+    fun start(context: Context, demoDir: String? = null, ai: Boolean = false, videos: List<String>? = null): Boolean {
         if (!available()) return false
         val intent = Intent(context, DetectionService::class.java)
         if (demoDir != null) intent.putExtra("demoDir", demoDir)
+        if (!videos.isNullOrEmpty()) intent.putStringArrayListExtra("videos", ArrayList(videos))
         intent.putExtra("ai", ai)
         ContextCompat.startForegroundService(context, intent)
         return true
@@ -73,6 +74,10 @@ object RoadGuardBridge {
             "last" to (s?.lastEvent ?: "-"),
             "gps" to (p?.location?.last != null),
             "demo" to Hub.demoActive,
+            "videoClip" to (Hub.video?.name ?: ""),
+            "videoIndex" to (Hub.video?.index ?: 0),
+            "videoCount" to (Hub.video?.count ?: 0),
+            "videoDone" to Hub.videoDone,
             "aiOn" to (p?.ai?.enabled == true),
             "aiCalls" to (p?.ai?.calls ?: 0),
             "aiFail" to (p?.ai?.failures ?: 0),
@@ -98,6 +103,9 @@ object RoadGuardBridge {
                         "id" to id,
                         "type" to j.getString("type"),
                         "timeMs" to j.optLong("timeMs"),
+                        "imported" to j.optBoolean("imported"),
+                        "occurredMs" to (if (j.has("occurredMs")) j.getLong("occurredMs") else null),
+                        "clip" to j.optString("clip"),
                         "score" to j.optDouble("score"),
                         "plateText" to j.optString("plateText"),
                         "plateValid" to j.optBoolean("plateValid"),

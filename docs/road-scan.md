@@ -203,13 +203,32 @@ camera sees now, to check the plate crop and text.
 adb shell "run-as <package> am start-foreground-service --user 0 -n <package>/com.iqoo.roadguard.DetectionService -a com.iqoo.roadguard.TEST_CAPTURE"
 ```
 
-## Scanning a video
+## Scanning dashcam footage
 
-**Scan a video instead** (under Start Drive Mode on the Safety tab) opens the phone's video picker and runs
-the road scan on that video in place of the camera, for one drive. Frames are taken about every 66 ms of
-video time, up to 1280 px on the long side, and the video loops until you stop. The live card is labelled
-"Test feed, not the camera". There is no full-resolution still in this mode, so a plate is read from the
-video frame itself.
+**Scan a video instead** (under Start Drive Mode on the Safety tab) offers **Pick videos** (one or more clips)
+or **Pick a folder** (every clip in it, and in sub-folders a few levels down, oldest name first). The road scan
+then runs on those clips in place of the camera, one after another, each once. The live card is labelled
+"Footage from a video, not the camera" and shows "Clip 2 of 7: name". When the last clip ends, the scan stops
+by itself and the Drive report opens. Frames are taken about every 66 ms of video time, up to 1280 px on the
+long side. There is no full-resolution still in this mode, so a plate is read from the video frame itself.
+
+**Every event carries the clip's own time and place, never the phone's.** Footage was not filmed where and when
+it is scanned, so:
+
+- **Time.** The first timed fix of a GPS log beside the clip (satellite time) wins. Without one, the container's
+  creation date if it is believable (an unset 1970 date is not), then the clock in the file name
+  (`2023_1001_133850_001.MP4`, `VID_20231001_133850.mp4`; read as local time). If none gives a time, the event has
+  none and **cannot be reported** ("The clip has no recorded time").
+- **Place.** The container's own location tag, and/or a GPS log with the clip's name in the same folder
+  (`.gpx`, or `.nmea` / `.log` / `.txt` with `$GPRMC` lines; found for clips picked as a folder). With a timed log,
+  the fix nearest the moment in the clip is used, and only if it is within five minutes of it. If there is no
+  place, the event has none and **cannot be reported** ("No location was recorded").
+- A GPS log that is not this clip's trip is ignored, not guessed at.
+
+What I have not seen: how a given dashcam brand stores GPS. Some write it inside a proprietary track of the video
+file, which this does not read; a sidecar log or the container location tag is what is supported.
+
+The scan still asks for camera permission, because the scan service is declared as a camera service.
 
 ## AI answers and the evidence photo
 

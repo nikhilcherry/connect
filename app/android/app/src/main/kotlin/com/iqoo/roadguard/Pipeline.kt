@@ -54,6 +54,18 @@ class Pipeline(private val ctx: Context) {
     val governor = ThermalGovernor(ctx)
     val location = LocationTracker(ctx)
     val evidence = EvidenceStore(ctx, location)
+
+    /** Set while a video clip is being scanned: where and when it was recorded, and how far in we are. */
+    @Volatile var clip: ClipInfo? = null
+    @Volatile var clipOffsetMs = 0L
+
+    /** Where an event happened: the phone's place for the camera, the clip's own place for a clip (maybe none). */
+    private fun eventLocation(c: ClipInfo? = clip, offset: Long = clipOffsetMs): android.location.Location? =
+        if (c == null) location.last else c.locationAt(offset)?.let { p ->
+            android.location.Location("clip").apply { latitude = p.lat; longitude = p.lon }
+        }
+
+    private fun occurredAt(c: ClipInfo? = clip, offset: Long = clipOffsetMs): Long? = c?.startMs?.plus(offset)
     val stats = PipelineStats()
     val ai = AiVerifier()
     private val hiRes = PlateHiRes { if (::plate.isInitialized) plate else null }
@@ -175,7 +187,7 @@ class Pipeline(private val ctx: Context) {
         potholeStreak = if (best != null) potholeStreak + 1 else 0
         if (best == null || potholeStreak < 4 || nowMs - lastPotholeLogMs < 5000) return
 
-        val loc = location.last
+        val loc = eventLocation()
         if (loc != null && !lastPotholeLat.isNaN()) {
             val d = FloatArray(1)
             android.location.Location.distanceBetween(lastPotholeLat, lastPotholeLon, loc.latitude, loc.longitude, d)
@@ -184,7 +196,11 @@ class Pipeline(private val ctx: Context) {
         lastPotholeLogMs = nowMs
         loc?.let { lastPotholeLat = it.latitude; lastPotholeLon = it.longitude }
         val annotated = annotate(frame, listOf(Triple(best.box, "pothole %.2f".format(best.score), Color.RED)))
-        evidence.save("pothole", 0, best.score, nowMs, annotated, null, "", withClip = false)
+        val c = clip
+        evidence.save(
+            "pothole", 0, best.score, nowMs, annotated, null, "", withClip = false,
+            locationAtEvent = loc, imported = c != null, occurredMs = occurredAt(c), clipName = c?.name,
+        )
         stats.potholeEvents++
         stats.lastEvent = "pothole %.2f".format(best.score)
     }
@@ -234,6 +250,8 @@ class Pipeline(private val ctx: Context) {
                     tr.aiAskedAtMs = nowMs
                     tr.askFrame = frame.copy(Bitmap.Config.ARGB_8888, false)
                     tr.askBox = RectF(bike.box)
+                    tr.askClip = clip
+                    tr.askOffset = clipOffsetMs
                     val asked = ai.submit(encodeForAi(c.bmp)) { v ->
                         Log.i("RoadGuard", "ai verdict track=${tr.id}: " + (v?.let { "people=${it.people} helmets=${it.helmets.joinToString("") { h -> if (h) "H" else "x" }} conf=${it.confidence}" } ?: "none"))
                         tr.aiVerdict = v
@@ -301,11 +319,11 @@ class Pipeline(private val ctx: Context) {
         val note = "ai: people=${v.people} helmets=${v.helmets.joinToString("") { if (it) "H" else "x" }} conf=${v.confidence}"
         if (sure && v.people >= 3 && !tr.firedTriple) {
             tr.firedTriple = true
-            if (fire("triple_riding", tr, bike, frame, nowMs, note)) stats.tripleEvents++
+            if (fire("triple_riding", tr, bike, frame, nowMs, note, tr.askClip, tr.askOffset)) stats.tripleEvents++
         }
         if (sure && v.people >= 1 && v.anyBareHead && !tr.firedNoHelmet) {
             tr.firedNoHelmet = true
-            if (fire("no_helmet", tr, bike, frame, nowMs, note)) stats.noHelmetEvents++
+            if (fire("no_helmet", tr, bike, frame, nowMs, note, tr.askClip, tr.askOffset)) stats.noHelmetEvents++
         }
         if (!tr.aiCounted) {
             tr.aiCounted = true
@@ -377,7 +395,10 @@ class Pipeline(private val ctx: Context) {
         if (flags.none { it.label == f.label && IouTracker.iou(it.box, f.box) > 0.5f }) flags.add(f)
     }
 
-    private fun fire(type: String, tr: Track, bike: Detection, frame: Bitmap, nowMs: Long, note: String): Boolean {
+    private fun fire(
+        type: String, tr: Track, bike: Detection, frame: Bitmap, nowMs: Long, note: String,
+        eventClip: ClipInfo? = clip, eventOffset: Long = clipOffsetMs,
+    ): Boolean {
         if (isDuplicate(type, bike.box, nowMs)) return false
         var plateCrop: Bitmap? = null
         var plateBoxInFrame: RectF? = null
@@ -408,7 +429,8 @@ class Pipeline(private val ctx: Context) {
         marks.add(Triple(bike.box, label, Color.rgb(255, 120, 0)))
         plateBoxInFrame?.let { marks.add(Triple(it, "plate", Color.GREEN)) }
         val annotated = annotate(frame, marks)
-        val locNow = location.last
+        val locNow = eventLocation(eventClip, eventOffset)
+        val occurred = occurredAt(eventClip, eventOffset)
         // A violation is confirmed: take a full-resolution still and read the plate from that. The event
         // is saved when that finishes (about a second); if it cannot run, save it now as before.
         val source = Hub.stillSource
@@ -420,12 +442,14 @@ class Pipeline(private val ctx: Context) {
                 plateText = if (useHr) hr?.plateText else plate?.text,
                 plateValid = if (useHr) hr?.plateValid ?: false else plate?.valid ?: false,
                 eventMs = nowMs, vehicle = hr?.vehicle, plateHiRes = useHr, locationAtEvent = locNow,
+                imported = eventClip != null, occurredMs = occurred, clipName = eventClip?.name,
             )
         }
         if (!upgraded) {
             evidence.save(
                 type, tr.id, bike.score, nowMs, annotated, plateCrop, note, withClip = true,
                 plateText = plate?.text, plateValid = plate?.valid ?: false, locationAtEvent = locNow,
+                imported = eventClip != null, occurredMs = occurred, clipName = eventClip?.name,
             )
         }
         stats.violations++

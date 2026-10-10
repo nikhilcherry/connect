@@ -125,10 +125,13 @@ class EvidenceStore(context: Context, private val location: LocationTracker) {
         withClip: Boolean = true, plateText: String? = null, plateValid: Boolean = false,
         /** When the violation happened (a full-resolution pass can finish later than the event). */
         eventMs: Long = nowMs, vehicle: Bitmap? = null, plateHiRes: Boolean = false, locationAtEvent: Location? = null,
+        /** Footage from a video clip: [occurredMs] and [locationAtEvent] are the clip's own, never the phone's now. */
+        imported: Boolean = false, occurredMs: Long? = null, clipName: String? = null,
     ) {
         val id = "%s_%05d".format(type, counter.incrementAndGet())
         val dir = File(root, id).apply { mkdirs() }
-        val loc = locationAtEvent ?: location.last
+        // Imported footage was not filmed here: only the clip's own place counts, and none is better than the phone's.
+        val loc = if (imported) locationAtEvent else (locationAtEvent ?: location.last)
         val pre: List<Frame>
         synchronized(ringLock) {
             pre = if (withClip) ring.filter { eventMs - it.ts <= preSeconds * 1000L } else emptyList()
@@ -147,6 +150,7 @@ class EvidenceStore(context: Context, private val location: LocationTracker) {
                 .put("timeMs", eventMs).put("plateSaved", plate != null).put("note", extra)
                 .put("plateHiRes", plateHiRes).put("vehicleSaved", vehicle != null)
                 .put("plateText", plateText ?: "").put("plateValid", plateValid)
+            if (imported) json.put("imported", true).put("clip", clipName ?: "").also { if (occurredMs != null) it.put("occurredMs", occurredMs) }
             if (loc != null) json.put("lat", loc.latitude).put("lon", loc.longitude).put("speedMps", loc.speed.toDouble())
             synchronized(log) { log.appendText(json.toString() + "\n") }
         }

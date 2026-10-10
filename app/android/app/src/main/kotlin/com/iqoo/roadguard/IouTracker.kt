@@ -22,6 +22,8 @@ class Track(val id: Int, var box: RectF) {
     /** The frame and box the AI was asked about, so the evidence shows that moment, not a later one. */
     @Volatile var askFrame: android.graphics.Bitmap? = null
     @Volatile var askBox: RectF? = null
+    @Volatile var askClip: ClipInfo? = null
+    @Volatile var askOffset = 0L
 }
 
 /** Greedy IoU tracker. Good enough for slow-moving two-wheeler traffic at 15-30 Hz. */

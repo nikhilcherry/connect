@@ -51,7 +51,7 @@ class _DriveReportScreenState extends State<DriveReportScreen> {
       files: files,
       text: tr('{v} on {t}. Plate: {p}. Location: {l}', {
         'v': title,
-        't': DateFormat('d MMM y, h:mm a').format(e.time),
+        't': e.timeKnown ? DateFormat('d MMM y, h:mm a').format(e.time) : tr('not recorded'),
         'p': plate,
         'l': where,
       }),
@@ -158,6 +158,8 @@ class _EventCard extends StatelessWidget {
         ]);
       case ReportBlock.noLocation:
         return Text(tr('No location was recorded, so it can\'t be reported'), style: DLText.small);
+      case ReportBlock.noTime:
+        return Text(tr('The clip has no recorded time, so it can\'t be reported'), style: DLText.small);
     }
   }
 
@@ -191,8 +193,18 @@ class _EventCard extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Expanded(child: Text(_title, style: DLText.section)),
-              Text(DateFormat.jm().format(e.time), style: DLText.small),
+              Text(
+                !e.timeKnown ? '' : (e.imported ? DateFormat('d MMM, h:mm a').format(e.time) : DateFormat.jm().format(e.time)),
+                style: DLText.small,
+              ),
             ]),
+            if (e.imported) ...[
+              const SizedBox(height: 4),
+              Text(
+                e.timeKnown ? tr('From clip: {c}', {'c': e.clip}) : '${tr('From clip: {c}', {'c': e.clip})} · ${tr('Time not recorded in the clip')}',
+                style: DLText.small,
+              ),
+            ],
             if (plate != null) ...[const SizedBox(height: 6), Text(plate, style: DLText.body.copyWith(color: DL.muted))],
             if (e.hasLocation || e.isViolation) ...[
               const SizedBox(height: 10),

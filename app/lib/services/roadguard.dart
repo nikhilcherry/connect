@@ -20,6 +20,10 @@ class RoadStatus {
     this.gps = false,
     this.last = '-',
     this.demo = false,
+    this.videoClip = '',
+    this.videoIndex = 0,
+    this.videoCount = 0,
+    this.videoDone = false,
     this.aiOn = false,
     this.aiCalls = 0,
     this.aiFail = 0,
@@ -50,6 +54,13 @@ class RoadStatus {
   /// A recorded clip is standing in for the camera (lab builds only).
   final bool demo;
 
+  /// While video clips stand in for the camera: the clip being scanned (1-based index of count), and whether
+  /// the last one has finished.
+  final String videoClip;
+  final int videoIndex;
+  final int videoCount;
+  final bool videoDone;
+
   /// AI second opinion: on, how many checks were asked, how many failed, and what they cost (USD).
   final bool aiOn;
   final int aiCalls;
@@ -72,6 +83,10 @@ class RoadStatus {
       gps: m['gps'] == true,
       last: (m['last'] as String?) ?? '-',
       demo: m['demo'] == true,
+      videoClip: (m['videoClip'] as String?) ?? '',
+      videoIndex: i('videoIndex'),
+      videoCount: i('videoCount'),
+      videoDone: m['videoDone'] == true,
       aiOn: m['aiOn'] == true,
       aiCalls: i('aiCalls'),
       aiFail: i('aiFail'),
@@ -96,12 +111,18 @@ class RoadEvent {
     this.platePath,
     this.lat,
     this.lon,
+    this.imported = false,
+    this.clip = '',
+    this.timeKnown = true,
   });
 
   final String id;
 
   /// `pothole`, `triple_riding` or `no_helmet`.
   final String type;
+
+  /// When it happened. For footage from a video clip this is the clip's own recorded time, not when it was scanned;
+  /// see [timeKnown].
   final DateTime time;
   final double score;
   final String plateText;
@@ -128,10 +149,17 @@ class RoadEvent {
 
   bool get hasLocation => lat != null && lon != null;
 
+  /// Footage from a video clip, not the live camera: its place and time are the clip's own, and may be unknown.
+  final bool imported;
+  final String clip;
+
+  /// False for a clip with no recorded time: [time] is then only when it was scanned, and it must not be reported.
+  final bool timeKnown;
+
   factory RoadEvent.fromMap(Map<Object?, Object?> m) => RoadEvent(
         id: m['id'] as String,
         type: m['type'] as String,
-        time: DateTime.fromMillisecondsSinceEpoch((m['timeMs'] as num).toInt()),
+        time: DateTime.fromMillisecondsSinceEpoch(((m['occurredMs'] ?? m['timeMs']) as num).toInt()),
         score: (m['score'] as num?)?.toDouble() ?? 0,
         plateText: (m['plateText'] as String?) ?? '',
         plateValid: m['plateValid'] == true,
@@ -142,6 +170,9 @@ class RoadEvent {
         platePath: m['platePath'] as String?,
         lat: (m['lat'] as num?)?.toDouble(),
         lon: (m['lon'] as num?)?.toDouble(),
+        imported: m['imported'] == true,
+        clip: (m['clip'] as String?) ?? '',
+        timeKnown: m['imported'] != true || m['occurredMs'] != null,
       );
 }
 
@@ -159,8 +190,8 @@ class RoadGuard {
   /// Lab builds only: play frames from this folder instead of opening the camera.
   static String? demoDir;
 
-  /// A video file to scan instead of the camera, for one drive. Cleared when the drive ends.
-  static String? videoPath;
+  /// Video clips to scan instead of the camera, for one drive. Cleared when the drive ends.
+  static List<String>? videos;
 
   /// The user's choice; on by default.
   static final enabled = ValueNotifier<bool>(true);
@@ -206,7 +237,7 @@ class RoadGuard {
   /// Asks for camera access if needed, then starts the scan. False if it could not start.
   static Future<bool> start() async {
     try {
-      return await _channel.invokeMethod<bool>('start', {'demoDir': videoPath ?? demoDir, 'ai': aiEnabled.value}) ?? false;
+      return await _channel.invokeMethod<bool>('start', {'demoDir': demoDir, 'ai': aiEnabled.value, 'videos': videos}) ?? false;
     } catch (_) {
       return false;
     }
@@ -225,7 +256,22 @@ class RoadGuard {
     try {
       await _channel.invokeMethod<void>('stop');
     } catch (_) {}
-    videoPath = null;
+    videos = null;
+  }
+
+  /// Opens the system picker for one or more video clips; their addresses, or none if cancelled.
+  static Future<List<String>> pickVideos() => _pick('pickVideos');
+
+  /// Opens the system picker for a folder, and answers with every video clip in it (oldest name first).
+  static Future<List<String>> pickVideoFolder() => _pick('pickVideoFolder');
+
+  static Future<List<String>> _pick(String method) async {
+    try {
+      final l = await _channel.invokeMethod<List<Object?>>(method) ?? const [];
+      return [for (final e in l) e as String];
+    } catch (_) {
+      return const [];
+    }
   }
 
   static Future<RoadStatus?> status() async {

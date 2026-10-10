@@ -24,6 +24,9 @@ enum ReportBlock {
   /// No GPS fix was recorded for this event, so there is no latitude and longitude to send.
   noLocation,
 
+  /// Footage from a video clip that has no recorded time: only when it was scanned is known, and that is wrong.
+  noTime,
+
   alreadyReported,
 }
 
@@ -82,6 +85,7 @@ class ViolationReporter {
     if (!e.isViolation) return ReportBlock.notAViolation;
     if (alreadyReported) return ReportBlock.alreadyReported;
     if (!e.hasLocation) return ReportBlock.noLocation;
+    if (!e.timeKnown) return ReportBlock.noTime;
     return ReportBlock.none;
   }
 

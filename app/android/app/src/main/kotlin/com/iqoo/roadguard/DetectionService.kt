@@ -52,11 +52,13 @@ class DetectionService : LifecycleService() {
         Hub.beginSession()
         Hub.pipeline?.ai?.enabled = intent?.getBooleanExtra("ai", false) == true
         val demoDir = intent?.getStringExtra("demoDir")
-        if (demoDir != null) {
+        val videos = intent?.getStringArrayListExtra("videos")
+        if (!videos.isNullOrEmpty()) {
+            // Video clips the person picked, scanned in place of the camera.
+            if (video == null) video = VideoRunner(this, ClipReader.sources(this, videos))
+        } else if (demoDir != null) {
             // Test feed (lab build only): frames from a folder instead of the camera.
-            // A video file the person picked, or a folder of frames (lab).
-            val src = File(demoDir)
-            if (src.isFile) { if (video == null) video = VideoRunner(src) } else if (demo == null) demo = DemoRunner(src)
+            if (demo == null) demo = DemoRunner(File(demoDir))
         } else if (runner == null) {
             runner = CameraRunner(this).also { it.start(this, null) }
         }
