@@ -129,18 +129,15 @@ answers on the real crops from 12 to 9. On tiny far-away bikes the AI guesses wi
 those answers came back at 0.6 while correct ones were 0.9 or higher, so 0.75 filters them.
 These are small tests, judged by eye on 7 clips, not a benchmark.
 
-## Reporting a violation (authorised, plate must be clear)
+## Reporting a violation (authorised)
 
 A violation can be sent to a reporting webhook, but only when **a person authorises it** and the report
-passes three checks. Nothing is sent automatically.
+passes two checks. Nothing is sent automatically.
 
 1. **Authorise.** In the Drive report, each triple-riding or no-helmet event has an **Authorise and
    report** button. It opens a dialog that says what will be sent; nothing leaves the phone until the
    button in that dialog is pressed.
-2. **The plate must be clear.** A plate crop must exist **and** the text read from it must be a valid
-   Indian plate (for example `KA01AB1234`). Otherwise the card says "Plate not clear enough to report"
-   and the report cannot be sent, because a report without a clear plate identifies nobody.
-3. **There must be a location.** The event needs a GPS fix so that latitude and longitude can be sent.
+2. **There must be a location.** The event needs a GPS fix so that latitude and longitude can be sent.
    Otherwise the card says "No location was recorded".
 
 Potholes are never reported this way, and each violation can be reported once.
@@ -150,9 +147,9 @@ Potholes are never reported this way, and each violation can be reported once.
 | Part | Content |
 | --- | --- |
 | `frame` (file) | the evidence photo, with the violation marked |
-| `plate` (file) | the cropped number plate |
+| `plate` (file) | the cropped number plate, only when one was found |
 | `latitude`, `longitude` | where it happened |
-| `plate_number`, `plate_clear` | the plate text and `true` |
+| `plate_number`, `plate_clear` | the plate text (empty if it was not read) and `true` or `false` |
 | `violation` | `triple_riding` or `no_helmet` |
 | `timestamp` | when, in UTC (ISO 8601) |
 | `event_id`, `authorised`, `source`, `note` | the event, `true`, `connect-drive-mode`, and how it was decided |
@@ -171,10 +168,11 @@ Things to decide before real use:
   receives and keeps these reports.
 - **Authentication.** An open webhook accepts anything from anyone. Protect it with a secret header or
   a token that the app sends, and rate-limit it.
-- **Clear plates are rare at road distance.** At normal video distance, plates are a few pixels wide;
-  on the test clips none of the plates could be read. A report is only possible when the plate really is
-  readable, which today means close, sharp, well-lit vehicles. The full-resolution capture below is meant
-  to raise this; it has been run on a phone but not yet shown reading a real plate.
+- **Reports go out even when the plate was not read.** The photo, the violation, the time and the
+  coordinates are sent, with `plate_number` empty and `plate_clear` `false`, so the workflow can tell
+  these apart and a person can check the photo. At normal video distance plates are a few pixels wide and
+  were not read on the test clips; the full-resolution capture below is meant to raise this, and has been
+  run on a phone but not yet shown reading a real plate.
 
 ## Full-resolution plate capture
 

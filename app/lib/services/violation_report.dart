@@ -19,10 +19,6 @@ enum ReportBlock {
   /// Potholes are not traffic violations.
   notAViolation,
 
-  /// The number plate is missing or could not be read as a valid plate. A report without a clear
-  /// plate identifies nobody, so it is never sent.
-  plateNotClear,
-
   /// No GPS fix was recorded for this event, so there is no latitude and longitude to send.
   noLocation,
 
@@ -57,7 +53,6 @@ class ViolationReporter {
     if (!configured) return ReportBlock.notConfigured;
     if (!e.isViolation) return ReportBlock.notAViolation;
     if (alreadyReported) return ReportBlock.alreadyReported;
-    if (!e.plateClear) return ReportBlock.plateNotClear;
     if (!e.hasLocation) return ReportBlock.noLocation;
     return ReportBlock.none;
   }
@@ -104,7 +99,7 @@ class ViolationReporter {
         'latitude': e.lat!.toString(),
         'longitude': e.lon!.toString(),
         'plate_number': e.plateText,
-        'plate_clear': 'true',
+        'plate_clear': e.plateClear.toString(), // false when the plate was not read; the photo is still sent
         'plate_hires': e.plateHiRes.toString(),
         'authorised': 'true', // a person approved this report in the app
         'source': 'connect-drive-mode',
@@ -119,11 +114,13 @@ class ViolationReporter {
     if (block != ReportBlock.none || target == null) return ReportResult(false, block.name);
 
     final frame = File(e.framePath);
-    final plate = File(e.platePath!);
-    if (!await frame.exists() || !await plate.exists()) return const ReportResult(false, 'files missing');
+    if (!await frame.exists()) return const ReportResult(false, 'files missing');
+    // The plate crop only exists when a plate was found; a report without one is still sent.
+    final plate = e.platePath == null ? null : File(e.platePath!);
 
     final boundary = '----connect-${DateTime.now().microsecondsSinceEpoch}';
-    final files = <String, List<int>>{'frame': await frame.readAsBytes(), 'plate': await plate.readAsBytes()};
+    final files = <String, List<int>>{'frame': await frame.readAsBytes()};
+    if (plate != null && await plate.exists()) files['plate'] = await plate.readAsBytes();
     // The vehicle at full detail, when a full-resolution still was taken.
     final vehicle = e.vehiclePath == null ? null : File(e.vehiclePath!);
     if (vehicle != null && await vehicle.exists()) files['vehicle'] = await vehicle.readAsBytes();

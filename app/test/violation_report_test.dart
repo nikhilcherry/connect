@@ -44,13 +44,10 @@ void main() {
       expect(ViolationReporter.check(_event(type: 'pothole'), configured: true), ReportBlock.notAViolation);
     });
 
-    test('no plate crop means the plate is not clear', () {
-      expect(ViolationReporter.check(_event(platePath: null), configured: true), ReportBlock.plateNotClear);
-    });
-
-    test('text that is not a valid plate means the plate is not clear', () {
-      expect(ViolationReporter.check(_event(plateValid: false, plateText: 'XQ7'), configured: true), ReportBlock.plateNotClear);
-      expect(ViolationReporter.check(_event(plateText: ''), configured: true), ReportBlock.plateNotClear);
+    test('a violation is reportable even when the plate was not read', () {
+      expect(ViolationReporter.check(_event(platePath: null), configured: true), ReportBlock.none);
+      expect(ViolationReporter.check(_event(plateValid: false, plateText: 'XQ7'), configured: true), ReportBlock.none);
+      expect(ViolationReporter.check(_event(plateText: ''), configured: true), ReportBlock.none);
     });
 
     test('without a GPS fix there is no latitude and longitude to send', () {
@@ -71,6 +68,10 @@ void main() {
       expect(f['longitude'], '77.5946');
       expect(f['plate_number'], 'KA01AB1234');
       expect(f['plate_clear'], 'true');
+      // An unread plate is flagged, not hidden, so the workflow can tell the difference.
+      final unread = ViolationReporter.fieldsFor(_event(platePath: null, plateText: ''));
+      expect(unread['plate_clear'], 'false');
+      expect(unread['plate_number'], '');
       expect(f['authorised'], 'true');
       expect(f['timestamp'], '2026-10-10T09:30:15.000Z');
     });
@@ -129,6 +130,17 @@ void main() {
       expect(body, contains('name="plate_number"\r\n\r\nKA01AB1234'));
       expect(body, contains('name="frame"; filename="frame.jpg"'));
       expect(body, contains('name="plate"; filename="plate.jpg"'));
+    });
+
+    test('a violation whose plate was not read is still posted, flagged as not clear', () async {
+      final noPlate = _event(framePath: '${dir.path}/frame.jpg', platePath: null, plateText: '', plateValid: false);
+      final r = await reporter().report(noPlate);
+      expect(r.ok, isTrue);
+      final body = received.single['body'] as String;
+      expect(body, contains('name="plate_clear"\r\n\r\nfalse'));
+      expect(body, contains('name="latitude"\r\n\r\n12.9716'));
+      expect(body, contains('name="frame"; filename="frame.jpg"'));
+      expect(body, isNot(contains('name="plate"; filename')));
     });
 
     test('it is remembered as reported and is not sent twice', () async {

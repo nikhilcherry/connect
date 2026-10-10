@@ -133,8 +133,6 @@ class _EventCard extends StatelessWidget {
           const SizedBox(width: 6),
           Text(tr('Reported'), style: DLText.small.copyWith(color: DL.success)),
         ]);
-      case ReportBlock.plateNotClear:
-        return Text(tr('Plate not clear enough to report'), style: DLText.small);
       case ReportBlock.noLocation:
         return Text(tr('No location was recorded, so it can\'t be reported'), style: DLText.small);
     }
