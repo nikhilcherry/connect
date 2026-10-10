@@ -212,7 +212,6 @@
 <script>
 (() => {
   const CFG = window.CONNECT_CONFIG || {};
-  const ENDPOINT = `${CFG.supabaseUrl}/functions/v1/scan`;
 
   const STR = {
     en: {
@@ -426,15 +425,41 @@
     });
   }
 
-  async function call(payload) {
-    const res = await fetch(ENDPOINT, {
+  // Tags live on whichever backend the owner's app talks to (the production
+  // project, or the demo server behind connect-api). Ask each in turn until
+  // one knows the code, then stay on it for the rest of the page's life.
+  const BACKENDS = CFG.backends && CFG.backends.length ? CFG.backends : [{ supabaseUrl: CFG.supabaseUrl, anonKey: CFG.anonKey }];
+  let active = null;
+  const ENDPOINT_OF = (b) => `${b.supabaseUrl}/functions/v1/scan`;
+  const NOT_FOUND = ["tag_not_found", "trip_not_found"];
+
+  async function callOn(b, payload) {
+    const res = await fetch(ENDPOINT_OF(b), {
       method: "POST",
-      headers: { "Content-Type": "application/json", apikey: CFG.anonKey || "" },
+      headers: { "Content-Type": "application/json", apikey: b.anonKey || "" },
       body: JSON.stringify(payload),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw Object.assign(new Error(data.error || "generic"), { code: data.error || "generic" });
     return data;
+  }
+
+  async function call(payload) {
+    if (active !== null) return callOn(BACKENDS[active], payload);
+    let notFound = null, down = null;
+    for (let i = 0; i < BACKENDS.length; i++) {
+      try {
+        const data = await callOn(BACKENDS[i], payload);
+        active = i;
+        return data;
+      } catch (e) {
+        if (!e.code) down = e; // no answer at all: this backend may simply be unreachable
+        else if (NOT_FOUND.includes(e.code)) notFound = e;
+        else throw e;
+      }
+    }
+    // A backend that didn't answer might have held the tag, so say "offline", not "not found".
+    throw down || notFound;
   }
 
   function renderReasons() {

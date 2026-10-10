@@ -135,7 +135,6 @@
 <script>
 (() => {
   const CFG = window.CONNECT_CONFIG || {};
-  const ENDPOINT = `${CFG.supabaseUrl}/functions/v1/scan`;
   const POLL_MS = 15000;
 
   const STR = {
@@ -296,15 +295,33 @@
     if (trail.length > 1) { const u = document.createElement("small"); u.textContent = "km"; $("distance").append(u); }
   }
 
+  // A trip lives on whichever backend the sharer's app talks to: ask each in
+  // turn until one knows the token, then stay on it.
+  const BACKENDS = CFG.backends && CFG.backends.length ? CFG.backends : [{ supabaseUrl: CFG.supabaseUrl, anonKey: CFG.anonKey }];
+  let active = null;
+
+  async function ask(b) {
+    const res = await fetch(`${b.supabaseUrl}/functions/v1/scan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: b.anonKey || "" },
+      body: JSON.stringify({ action: "trip", token }),
+    });
+    return { res, r: await res.json().catch(() => ({})) };
+  }
+
   async function poll() {
     try {
-      const res = await fetch(ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", apikey: CFG.anonKey || "" },
-        body: JSON.stringify({ action: "trip", token }),
-      });
-      const r = await res.json().catch(() => ({}));
-      if (res.status === 404) { stop(); return show("v-missing"); }
+      let got = null, down = false;
+      for (const i of active !== null ? [active] : BACKENDS.keys()) {
+        try {
+          got = await ask(BACKENDS[i]);
+        } catch { down = true; continue; }
+        if (got.res.status !== 404 || active !== null) { active = i; break; }
+      }
+      if (!got) return; // no backend answered; keep the last view
+      const { res, r } = got;
+      if (res.status === 404 && !down) { stop(); return show("v-missing"); }
+      if (res.status === 404) return; // a backend was unreachable: it may hold the trip
       if (!res.ok) return; // transient; the next tick retries
       last = r;
       if (r.ended) { stop(); return show("v-ended"); }
