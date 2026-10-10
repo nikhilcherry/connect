@@ -12,6 +12,12 @@ class Track(val id: Int, var box: RectF) {
     var firedTriple = false
     var firedNoHelmet = false
     var lastHelmetCheck = 0
+
+    /** AI second opinion: 0 not asked, 1 asked, 2 answered, 3 failed or timed out. */
+    @Volatile var aiState = 0
+    @Volatile var aiVerdict: AiVerdict? = null
+    var aiAskedAtMs = 0L
+    var aiCounted = false
 }
 
 /** Greedy IoU tracker. Good enough for slow-moving two-wheeler traffic at 15-30 Hz. */

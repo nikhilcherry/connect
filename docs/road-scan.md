@@ -96,3 +96,103 @@ These are suggestions for the driver to check, not evidence of an offence.
   speaker review them.
 - Models are stored uncompressed (47 MB). Half-precision files would roughly halve that.
 - Not tested on a bike in motion yet.
+
+## AI second opinion (optional, off by default)
+
+The on-device models are good at finding "a bike with people on it" and weak at the judgement calls
+(is that a third person, is that rider bare-headed). With **Double-check with AI** on, the phone sends
+**one tight crop of a suspect vehicle** (never the whole frame) to a vision model on OpenRouter and gets
+back how many people are seated on it and who wears a helmet. A confident answer (>= 0.75) decides; if
+it is off, offline, capped or times out, the on-device rules apply exactly as before.
+
+- **What is sent:** a JPEG crop of one vehicle and its seated riders, at most 512 px. It can show faces
+  and plates, so this is opt-in and the switch says so. Everything else still stays on the phone.
+- **Limits:** one check per vehicle, at most one every 1.2 s, 150 per drive, 15 s timeout.
+- **Cost:** about 0.005 US cents a check on `google/gemini-2.5-flash-lite` (19 checks on the demo clips
+  cost $0.0012). The app counts the real cost OpenRouter reports.
+- **Key:** read at build time from the git-ignored `android/local.properties`
+  (`roadguard.openrouter.key=...`) or the `OPENROUTER_API_KEY` environment variable. **A key inside an APK
+  can be extracted.** For anything beyond a demo, keep the key on a server (for example a Supabase edge
+  function that checks the signed-in user and rate-limits) and set a credit limit on the key in the
+  OpenRouter dashboard. Rotate any key that has been shared.
+
+Measured, on real data:
+
+| Test | On-device | AI (`gemini-2.5-flash-lite`) |
+| --- | --- | --- |
+| Bare head or not, 60 labeled helmet photos | 88% right | **95% right** |
+| Real bike crops from 7 Indian clips, people on the bike | the rule counted 2 on a bike carrying 3 | counted 3 on all 8 crops of the two genuine three-up bikes |
+| The "4 people on a motorcycle" bike | missed entirely | caught |
+
+A tighter prompt ("count only people sitting on the vehicle, ignore bystanders") cut false "3 people"
+answers on the real crops from 12 to 9. On tiny far-away bikes the AI guesses with a flat confidence;
+those answers came back at 0.6 while correct ones were 0.9 or higher, so 0.75 filters them.
+These are small tests, judged by eye on 7 clips, not a benchmark.
+
+## Reporting a violation (authorised, plate must be clear)
+
+A violation can be sent to a reporting webhook, but only when **a person authorises it** and the report
+passes three checks. Nothing is sent automatically.
+
+1. **Authorise.** In the Drive report, each triple-riding or no-helmet event has an **Authorise and
+   report** button. It opens a dialog that says what will be sent; nothing leaves the phone until the
+   button in that dialog is pressed.
+2. **The plate must be clear.** A plate crop must exist **and** the text read from it must be a valid
+   Indian plate (for example `KA01AB1234`). Otherwise the card says "Plate not clear enough to report"
+   and the report cannot be sent, because a report without a clear plate identifies nobody.
+3. **There must be a location.** The event needs a GPS fix so that latitude and longitude can be sent.
+   Otherwise the card says "No location was recorded".
+
+Potholes are never reported this way, and each violation can be reported once.
+
+**What is sent** (a `multipart/form-data` POST):
+
+| Part | Content |
+| --- | --- |
+| `frame` (file) | the evidence photo, with the violation marked |
+| `plate` (file) | the cropped number plate |
+| `latitude`, `longitude` | where it happened |
+| `plate_number`, `plate_clear` | the plate text and `true` |
+| `violation` | `triple_riding` or `no_helmet` |
+| `timestamp` | when, in UTC (ISO 8601) |
+| `event_id`, `authorised`, `source`, `note` | the event, `true`, `connect-drive-mode`, and how it was decided |
+
+**Setup.** Reporting is hidden unless the build is given an address. Keep the real address out of the
+repository:
+
+```
+flutter build apk --dart-define=VIOLATION_WEBHOOK_URL=https://your-host/webhook/traffic-violation
+```
+
+Things to decide before real use:
+
+- **Privacy and law.** A report contains a photo of someone else's vehicle, their number plate and a
+  location. Check the rules that apply (in India, the Digital Personal Data Protection Act) and who
+  receives and keeps these reports.
+- **Authentication.** An open webhook accepts anything from anyone. Protect it with a secret header or
+  a token that the app sends, and rate-limit it.
+- **Clear plates are rare at road distance.** At normal video distance, plates are a few pixels wide;
+  on the test clips none of the plates could be read. A report is only possible when the plate really is
+  readable, which today means close, sharp, well-lit vehicles. The full-resolution capture below is meant
+  to raise this; it has been run on a phone but not yet shown reading a real plate.
+
+## Full-resolution plate capture
+
+When a violation is confirmed, the app takes one full-resolution photo (about 12 MP; 3264x2448 on the
+iQOO 15) through CameraX `ImageCapture`, which runs alongside the analysis stream. The vehicle is cut out
+of that photo (`BitmapRegionDecoder`, so the whole image is never held in memory), a plate detector looks
+for the plate in it, and the plate is cut from the full-resolution pixels and read with ML Kit.
+
+- The vehicle's box in the analysis frame is mapped into the stored JPEG by `StillMapper`, allowing for the
+  JPEG's rotation. It is unit-tested for all four rotations.
+- If the first photo misses because the vehicle moved, it tries once more where the tracker now has it.
+- Saved with the event: `plate.jpg` (full-resolution crop), `vehicle_hr.jpg` (vehicle, longest side at most
+  1600 px), and `plateHiRes` in the record. The report sends the vehicle photo too.
+- One pass at a time and at least 1.2 s apart, so it cannot pile up behind a busy road.
+
+Lab test hook (lab build only, while Drive Mode is running): saves a capture event from whatever the
+camera sees now, to check the plate crop and text.
+
+```
+adb shell "run-as <package> am start-foreground-service --user 0 -n <package>/com.iqoo.roadguard.DetectionService -a com.iqoo.roadguard.TEST_CAPTURE"
+```

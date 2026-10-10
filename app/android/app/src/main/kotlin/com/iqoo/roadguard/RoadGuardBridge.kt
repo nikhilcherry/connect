@@ -3,6 +3,7 @@ package com.iqoo.roadguard
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
+import app.connectcar.connect.BuildConfig
 import org.json.JSONObject
 import java.io.File
 
@@ -32,10 +33,14 @@ object NativeRuntime {
 object RoadGuardBridge {
     fun available(): Boolean = NativeRuntime.ensure()
 
-    fun start(context: Context, demoDir: String? = null): Boolean {
+    /** True when this build has an OpenRouter key, so the AI second opinion can be offered. */
+    fun aiAvailable(): Boolean = BuildConfig.OPENROUTER_API_KEY.isNotBlank()
+
+    fun start(context: Context, demoDir: String? = null, ai: Boolean = false): Boolean {
         if (!available()) return false
         val intent = Intent(context, DetectionService::class.java)
         if (demoDir != null) intent.putExtra("demoDir", demoDir)
+        intent.putExtra("ai", ai)
         ContextCompat.startForegroundService(context, intent)
         return true
     }
@@ -68,6 +73,12 @@ object RoadGuardBridge {
             "last" to (s?.lastEvent ?: "-"),
             "gps" to (p?.location?.last != null),
             "demo" to Hub.demoActive,
+            "aiOn" to (p?.ai?.enabled == true),
+            "aiCalls" to (p?.ai?.calls ?: 0),
+            "aiFail" to (p?.ai?.failures ?: 0),
+            "aiCost" to (p?.ai?.costUsd ?: 0.0),
+            "aiConfirms" to (s?.aiConfirms ?: 0),
+            "aiVetoes" to (s?.aiVetoes ?: 0),
         )
     }
 
@@ -90,6 +101,9 @@ object RoadGuardBridge {
                         "score" to j.optDouble("score"),
                         "plateText" to j.optString("plateText"),
                         "plateValid" to j.optBoolean("plateValid"),
+                        "note" to j.optString("note"),
+                        "plateHiRes" to j.optBoolean("plateHiRes"),
+                        "vehiclePath" to if (j.optBoolean("vehicleSaved")) File(root, "$id/vehicle_hr.jpg").path else null,
                         "lat" to if (j.has("lat")) j.getDouble("lat") else null,
                         "lon" to if (j.has("lon")) j.getDouble("lon") else null,
                         "framePath" to File(root, "$id/frame.jpg").path,

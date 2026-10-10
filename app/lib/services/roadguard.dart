@@ -20,6 +20,10 @@ class RoadStatus {
     this.gps = false,
     this.last = '-',
     this.demo = false,
+    this.aiOn = false,
+    this.aiCalls = 0,
+    this.aiFail = 0,
+    this.aiCost = 0,
   });
 
   final bool running;
@@ -46,6 +50,12 @@ class RoadStatus {
   /// A recorded clip is standing in for the camera (lab builds only).
   final bool demo;
 
+  /// AI second opinion: on, how many checks were asked, how many failed, and what they cost (USD).
+  final bool aiOn;
+  final int aiCalls;
+  final int aiFail;
+  final double aiCost;
+
   factory RoadStatus.fromMap(Map<Object?, Object?> m) {
     int i(String k) => (m[k] as num?)?.toInt() ?? 0;
     return RoadStatus(
@@ -62,6 +72,10 @@ class RoadStatus {
       gps: m['gps'] == true,
       last: (m['last'] as String?) ?? '-',
       demo: m['demo'] == true,
+      aiOn: m['aiOn'] == true,
+      aiCalls: i('aiCalls'),
+      aiFail: i('aiFail'),
+      aiCost: (m['aiCost'] as num?)?.toDouble() ?? 0,
     );
   }
 }
@@ -75,7 +89,10 @@ class RoadEvent {
     required this.score,
     required this.plateText,
     required this.plateValid,
+    required this.note,
     required this.framePath,
+    this.vehiclePath,
+    this.plateHiRes = false,
     this.platePath,
     this.lat,
     this.lon,
@@ -89,12 +106,27 @@ class RoadEvent {
   final double score;
   final String plateText;
   final bool plateValid;
+
+  /// How the event was decided ("ai: people=3 ..." or "riders=3").
+  final String note;
   final String framePath;
   final String? platePath;
+
+  /// The vehicle at full detail, from the full-resolution still, when one could be taken.
+  final String? vehiclePath;
+
+  /// The plate crop comes from the full-resolution still, not the low-resolution analysis frame.
+  final bool plateHiRes;
   final double? lat;
   final double? lon;
 
-  bool get isViolation => type != 'pothole';
+  bool get isViolation => type == 'triple_riding' || type == 'no_helmet';
+
+  /// The number plate is clear enough to act on: a crop was saved and the text read from it is a valid
+  /// plate. A blurry crop that reads as nonsense does not count.
+  bool get plateClear => platePath != null && plateValid && plateText.isNotEmpty;
+
+  bool get hasLocation => lat != null && lon != null;
 
   factory RoadEvent.fromMap(Map<Object?, Object?> m) => RoadEvent(
         id: m['id'] as String,
@@ -103,7 +135,10 @@ class RoadEvent {
         score: (m['score'] as num?)?.toDouble() ?? 0,
         plateText: (m['plateText'] as String?) ?? '',
         plateValid: m['plateValid'] == true,
+        note: (m['note'] as String?) ?? '',
         framePath: m['framePath'] as String,
+        vehiclePath: m['vehiclePath'] as String?,
+        plateHiRes: m['plateHiRes'] == true,
         platePath: m['platePath'] as String?,
         lat: (m['lat'] as num?)?.toDouble(),
         lon: (m['lon'] as num?)?.toDouble(),
@@ -119,6 +154,7 @@ class RoadEvent {
 class RoadGuard {
   static const _channel = MethodChannel('connect/roadguard');
   static const _pref = 'road_scan_on';
+  static const _prefAi = 'road_scan_ai';
 
   /// Lab builds only: play frames from this folder instead of opening the camera.
   static String? demoDir;
@@ -126,9 +162,19 @@ class RoadGuard {
   /// The user's choice; on by default.
   static final enabled = ValueNotifier<bool>(true);
 
+  /// Opt-in second opinion from a cloud AI on suspect vehicles. Off by default: it uploads a cropped
+  /// photo of the vehicle. Only offered when this build has a key.
+  static final aiEnabled = ValueNotifier<bool>(false);
+  static final aiAvailable = ValueNotifier<bool>(false);
+
   static Future<void> load() async {
     try {
-      enabled.value = (await SharedPreferences.getInstance()).getBool(_pref) ?? true;
+      final p = await SharedPreferences.getInstance();
+      enabled.value = p.getBool(_pref) ?? true;
+      aiEnabled.value = p.getBool(_prefAi) ?? false;
+    } catch (_) {}
+    try {
+      aiAvailable.value = await _channel.invokeMethod<bool>('aiAvailable') ?? false;
     } catch (_) {}
   }
 
@@ -136,6 +182,13 @@ class RoadGuard {
     enabled.value = on;
     try {
       await (await SharedPreferences.getInstance()).setBool(_pref, on);
+    } catch (_) {}
+  }
+
+  static Future<void> setAiEnabled(bool on) async {
+    aiEnabled.value = on;
+    try {
+      await (await SharedPreferences.getInstance()).setBool(_prefAi, on);
     } catch (_) {}
   }
 
@@ -150,7 +203,7 @@ class RoadGuard {
   /// Asks for camera access if needed, then starts the scan. False if it could not start.
   static Future<bool> start() async {
     try {
-      return await _channel.invokeMethod<bool>('start', {'demoDir': demoDir}) ?? false;
+      return await _channel.invokeMethod<bool>('start', {'demoDir': demoDir, 'ai': aiEnabled.value}) ?? false;
     } catch (_) {
       return false;
     }

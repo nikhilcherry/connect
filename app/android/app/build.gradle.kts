@@ -1,7 +1,18 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+// OpenRouter key for the optional AI second opinion. Never committed: it lives in the git-ignored
+// android/local.properties (roadguard.openrouter.key=...) or the OPENROUTER_API_KEY environment variable.
+val roadguardAiKey: String = run {
+    val props = Properties()
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { props.load(it) }
+    props.getProperty("roadguard.openrouter.key") ?: System.getenv("OPENROUTER_API_KEY") ?: ""
 }
 
 android {
@@ -19,6 +30,7 @@ android {
     }
     // Model files must stay uncompressed so ncnn can read them straight from the APK.
     androidResources { noCompress += listOf("bin", "param") }
+    buildFeatures { buildConfig = true }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -38,6 +50,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        buildConfigField("String", "OPENROUTER_API_KEY", "\"${roadguardAiKey}\"")
         externalNativeBuild {
             cmake {
                 cppFlags += "-std=c++17"
@@ -78,6 +91,8 @@ configurations.all {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    testImplementation("junit:junit:4.13.2")
 
     // RoadGuard road scan
     val camerax = "1.4.2"

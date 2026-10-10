@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.PowerManager
+import android.util.Log
 import java.io.File
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
@@ -27,6 +28,10 @@ class DetectionService : LifecycleService() {
             stopSelf()
             return START_NOT_STICKY
         }
+        if (intent?.action == ACTION_TEST_CAPTURE) {
+            Log.i("RoadGuard", "test capture started=${Hub.pipeline?.testHiRes() == true}")
+            return START_NOT_STICKY
+        }
         getSystemService(NotificationManager::class.java)
             .createNotificationChannel(NotificationChannel(CHANNEL, "Drive Mode road scan", NotificationManager.IMPORTANCE_LOW))
         val launch = packageManager.getLaunchIntentForPackage(packageName)
@@ -44,6 +49,7 @@ class DetectionService : LifecycleService() {
         )
         Hub.start(this)
         Hub.beginSession()
+        Hub.pipeline?.ai?.enabled = intent?.getBooleanExtra("ai", false) == true
         val demoDir = intent?.getStringExtra("demoDir")
         if (demoDir != null) {
             // Test feed (lab build only): frames from a folder instead of the camera.
@@ -73,6 +79,7 @@ class DetectionService : LifecycleService() {
         const val CHANNEL = "roadscan"
         const val NOTIFICATION_ID = 4107
         const val ACTION_STOP = "com.iqoo.roadguard.STOP"
+        const val ACTION_TEST_CAPTURE = "com.iqoo.roadguard.TEST_CAPTURE"
 
         @Volatile
         var running = false

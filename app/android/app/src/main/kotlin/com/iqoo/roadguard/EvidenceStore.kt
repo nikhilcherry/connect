@@ -123,14 +123,16 @@ class EvidenceStore(context: Context, private val location: LocationTracker) {
     fun save(
         type: String, trackId: Int, score: Float, nowMs: Long, annotated: Bitmap, plate: Bitmap?, extra: String,
         withClip: Boolean = true, plateText: String? = null, plateValid: Boolean = false,
+        /** When the violation happened (a full-resolution pass can finish later than the event). */
+        eventMs: Long = nowMs, vehicle: Bitmap? = null, plateHiRes: Boolean = false, locationAtEvent: Location? = null,
     ) {
         val id = "%s_%05d".format(type, counter.incrementAndGet())
         val dir = File(root, id).apply { mkdirs() }
-        val loc = location.last
+        val loc = locationAtEvent ?: location.last
         val pre: List<Frame>
         synchronized(ringLock) {
-            pre = if (withClip) ring.filter { nowMs - it.ts <= preSeconds * 1000L } else emptyList()
-            if (withClip) pending.add(PendingClip(dir, nowMs + postSeconds * 1000L, 0))
+            pre = if (withClip) ring.filter { eventMs - it.ts <= preSeconds * 1000L } else emptyList()
+            if (withClip && System.currentTimeMillis() < eventMs + postSeconds * 1000L) pending.add(PendingClip(dir, eventMs + postSeconds * 1000L, 0))
         }
         // The caller hands over fresh bitmaps that it never touches again.
         val frameCopy = annotated
@@ -138,10 +140,12 @@ class EvidenceStore(context: Context, private val location: LocationTracker) {
         ioExec.execute {
             File(dir, "frame.jpg").outputStream().use { frameCopy.compress(Bitmap.CompressFormat.JPEG, 90, it) }
             plateCopy?.let { p -> File(dir, "plate.jpg").outputStream().use { p.compress(Bitmap.CompressFormat.JPEG, 95, it) } }
+            vehicle?.let { v -> File(dir, "vehicle_hr.jpg").outputStream().use { v.compress(Bitmap.CompressFormat.JPEG, 92, it) } }
             pre.forEachIndexed { i, f -> File(dir, "pre_%03d.jpg".format(i)).writeBytes(f.jpeg) }
             val json = JSONObject()
                 .put("id", id).put("type", type).put("track", trackId).put("score", score.toDouble())
-                .put("timeMs", nowMs).put("plateSaved", plate != null).put("note", extra)
+                .put("timeMs", eventMs).put("plateSaved", plate != null).put("note", extra)
+                .put("plateHiRes", plateHiRes).put("vehicleSaved", vehicle != null)
                 .put("plateText", plateText ?: "").put("plateValid", plateValid)
             if (loc != null) json.put("lat", loc.latitude).put("lon", loc.longitude).put("speedMps", loc.speed.toDouble())
             synchronized(log) { log.appendText(json.toString() + "\n") }

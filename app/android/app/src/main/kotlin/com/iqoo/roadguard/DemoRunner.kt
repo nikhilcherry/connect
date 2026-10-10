@@ -45,8 +45,10 @@ class DemoRunner(private val dir: File) {
                         val st = pipeline.stats
                         Log.i(
                             "RoadGuard",
-                            "demo fps=%.1f total=%.0fms pothole=%.0fms coco=%.0fms thermal=%d headroom=%.2f".format(
-                                Hub.fps, st.totalMs, st.potholeMs, st.cocoMs, pipeline.governor.status, pipeline.governor.headroom,
+                            ("demo fps=%.1f total=%.0fms thermal=%d viol=%d (triple %d, helmet %d) " +
+                                "ai[on=%s calls=%d fail=%d cost=$%.4f confirms=%d vetoes=%d]").format(
+                                Hub.fps, st.totalMs, pipeline.governor.status, st.violations, st.tripleEvents, st.noHelmetEvents,
+                                pipeline.ai.enabled, pipeline.ai.calls, pipeline.ai.failures, pipeline.ai.costUsd, st.aiConfirms, st.aiVetoes,
                             ),
                         )
                         frames = 0

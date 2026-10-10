@@ -60,6 +60,30 @@ class SafetyTab extends StatelessWidget {
                 Switch(value: on, onChanged: RoadGuard.setEnabled),
               ]),
             ),
+            ValueListenableBuilder<bool>(
+              valueListenable: RoadGuard.aiAvailable,
+              builder: (_, available, _) => !available
+                  ? const SizedBox.shrink()
+                  : ValueListenableBuilder<bool>(
+                      valueListenable: RoadGuard.aiEnabled,
+                      builder: (_, aiOn, _) => Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Row(children: [
+                          Expanded(
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text(tr('Double-check with AI'), style: DLText.body.copyWith(fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 2),
+                              Text(
+                                tr('Sends a cropped photo of a suspect vehicle to a cloud AI service for a second opinion. Needs internet. Off by default.'),
+                                style: DLText.small,
+                              ),
+                            ]),
+                          ),
+                          Switch(value: aiOn, onChanged: RoadGuard.setAiEnabled),
+                        ]),
+                      ),
+                    ),
+            ),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
@@ -810,6 +834,10 @@ class _RoadPanel extends StatelessWidget {
                   _count(tr('Potholes'), s.potholes),
                   _count(tr('Violations'), s.violations),
                 ]),
+                if (s.aiOn) ...[
+                  const SizedBox(height: 8),
+                  Text(tr('AI second opinions: {n}', {'n': '${s.aiCalls - s.aiFail}'}), style: DLText.small.copyWith(color: DL.onDarkMuted)),
+                ],
                 if (last != null) ...[
                   const SizedBox(height: 10),
                   Text(tr('Last: {x}', {'x': last}), style: DLText.small.copyWith(color: DL.onDarkMuted)),

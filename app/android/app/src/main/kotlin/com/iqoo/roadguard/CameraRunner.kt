@@ -10,15 +10,20 @@ import android.view.Display
 import android.view.Surface
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /** Process-wide holder so the Activity and the foreground Service share one pipeline. */
 object Hub {
@@ -28,6 +33,9 @@ object Hub {
 
     /** True only while a lab test feed (DemoRunner) stands in for the camera. */
     @Volatile var demoActive = false
+
+    /** The running camera, when it can take a full-resolution still (not for the lab test feed). */
+    @Volatile var stillSource: StillSource? = null
     @Volatile var fps = 0f
     @Volatile var skipped = 0L
 
@@ -51,6 +59,7 @@ object Hub {
         overlay = null
         lastFrame = null
         demoActive = false
+        stillSource = null
         fps = 0f
     }
 
@@ -64,10 +73,12 @@ object Hub {
 }
 
 /** Binds CameraX analysis (and optionally a preview) and feeds frames to the pipeline. */
-class CameraRunner(private val context: Context) {
+class CameraRunner(private val context: Context) : StillSource {
     private val executor = Executors.newSingleThreadExecutor()
     private var provider: ProcessCameraProvider? = null
     private var analysisUseCase: ImageAnalysis? = null
+    private var imageCapture: ImageCapture? = null
+    private val captureExecutor = Executors.newSingleThreadExecutor()
     private var lastRotationCheckMs = 0L
     private var loggedGeometry = false
 
@@ -88,6 +99,7 @@ class CameraRunner(private val context: Context) {
             val analysis = ImageAnalysis.Builder()
                 .setResolutionSelector(
                     ResolutionSelector.Builder()
+                        .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
                         .setResolutionStrategy(
                             ResolutionStrategy(Size(1280, 720), ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER),
                         ).build(),
@@ -99,17 +111,67 @@ class CameraRunner(private val context: Context) {
             analysis.setAnalyzer(executor) { proxy -> analyze(proxy) }
             analysisUseCase = analysis
             p.unbindAll()
-            if (previewView != null) {
-                val preview = Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
-                p.bindToLifecycle(owner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
-            } else {
-                p.bindToLifecycle(owner, CameraSelector.DEFAULT_BACK_CAMERA, analysis)
+            // Full-resolution stills for number plates: same 4:3 view as the analysis, up to ~12 MP.
+            val capture = ImageCapture.Builder()
+                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                .setResolutionSelector(
+                    ResolutionSelector.Builder()
+                        .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
+                        .setResolutionStrategy(ResolutionStrategy(Size(4000, 3000), ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER))
+                        .build(),
+                )
+                .setTargetRotation(displayRotation())
+                .build()
+            val sel = CameraSelector.DEFAULT_BACK_CAMERA
+            val preview = previewView?.let { pv -> Preview.Builder().build().also { it.setSurfaceProvider(pv.surfaceProvider) } }
+            try {
+                if (preview != null) p.bindToLifecycle(owner, sel, preview, analysis, capture)
+                else p.bindToLifecycle(owner, sel, analysis, capture)
+                imageCapture = capture
+                Hub.stillSource = this
+                Log.i("RoadGuard", "full-resolution stills available")
+            } catch (t: Throwable) {
+                Log.w("RoadGuard", "this camera cannot take stills beside the analysis ($t); plates stay at analysis resolution")
+                p.unbindAll()
+                if (preview != null) p.bindToLifecycle(owner, sel, preview, analysis) else p.bindToLifecycle(owner, sel, analysis)
             }
         }, ContextCompat.getMainExecutor(context))
     }
 
     fun stop() {
+        Hub.stillSource = null
+        imageCapture = null
         provider?.unbindAll()
+    }
+
+    /** One full-resolution photo, waiting up to [timeoutMs]. Called from a worker thread, never the camera thread. */
+    override fun captureStill(timeoutMs: Long): Still? {
+        val cap = imageCapture ?: return null
+        val latch = CountDownLatch(1)
+        var out: Still? = null
+        cap.takePicture(
+            captureExecutor,
+            object : ImageCapture.OnImageCapturedCallback() {
+                override fun onCaptureSuccess(image: ImageProxy) {
+                    try {
+                        val buf = image.planes[0].buffer
+                        val bytes = ByteArray(buf.remaining())
+                        buf.get(bytes)
+                        out = Still(bytes, image.imageInfo.rotationDegrees)
+                    } finally {
+                        image.close()
+                        latch.countDown()
+                    }
+                }
+
+                override fun onError(exception: ImageCaptureException) {
+                    Log.w("RoadGuard", "still capture failed: ${exception.message}")
+                    latch.countDown()
+                }
+            },
+        )
+        latch.await(timeoutMs, TimeUnit.MILLISECONDS)
+        return out
     }
 
     private fun analyze(proxy: ImageProxy) {
@@ -128,6 +190,7 @@ class CameraRunner(private val context: Context) {
             if (now - lastRotationCheckMs > 1000) {
                 lastRotationCheckMs = now
                 analysisUseCase?.targetRotation = displayRotation()
+                imageCapture?.targetRotation = displayRotation()
             }
             var bmp = proxy.toBitmap()
             val rotation = proxy.imageInfo.rotationDegrees

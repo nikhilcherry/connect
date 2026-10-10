@@ -5,6 +5,8 @@
 //   CONNECT_ID_SUFFIX=.rg flutter build apk --debug --target-platform android-arm64 -t tool/drive_lab.dart
 //   adb install -r build/app/outputs/flutter-apk/app-debug.apk
 //   adb shell am start -n app.connectcar.connect.rg/app.connectcar.connect.MainActivity
+import 'dart:io';
+
 import 'package:connect/data/app_state.dart';
 import 'package:connect/data/models.dart';
 import 'package:connect/l10n.dart';
@@ -13,6 +15,7 @@ import 'package:connect/screens/safety_tab.dart';
 import 'package:connect/services/roadguard.dart';
 import 'package:connect/theme.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 Future<void> main() async {
@@ -21,6 +24,10 @@ Future<void> main() async {
   // Replay clips instead of using the camera (see docs/road-scan.md, "Lab").
   RoadGuard.demoDir = const String.fromEnvironment('DEMO_DIR');
   if (RoadGuard.demoDir!.isEmpty) RoadGuard.demoDir = null;
+  // AI second opinion: switched on when an `ai.flag` file sits in the app's files folder, so a test can
+  // turn it on without tapping. Otherwise the saved choice from the Safety tab switch is used.
+  final dir = await getExternalStorageDirectory();
+  if (dir != null && File('${dir.path}/ai.flag').existsSync()) await RoadGuard.setAiEnabled(true);
   // A client that is never used: nothing here talks to a server.
   final state = AppState(SupabaseClient('http://127.0.0.1:1', 'lab'))
     ..loading = false

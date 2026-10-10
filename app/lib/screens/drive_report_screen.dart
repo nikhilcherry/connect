@@ -6,18 +6,65 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n.dart';
 import '../services/roadguard.dart';
+import '../services/violation_report.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
 /// What the road scan caught during the drive that just ended. Photos and positions stay on this
-/// phone and are deleted after a week.
-class DriveReportScreen extends StatelessWidget {
-  const DriveReportScreen({super.key, required this.events});
+/// phone and are deleted after a week, unless you authorise a violation to be reported.
+class DriveReportScreen extends StatefulWidget {
+  const DriveReportScreen({super.key, required this.events, this.reporter});
 
   final List<RoadEvent> events;
 
+  /// Overridable so tests can point reports at a local server.
+  final ViolationReporter? reporter;
+
+  @override
+  State<DriveReportScreen> createState() => _DriveReportScreenState();
+}
+
+class _DriveReportScreenState extends State<DriveReportScreen> {
+  late final ViolationReporter _reporter = widget.reporter ?? ViolationReporter();
+  Set<String> _reported = {};
+  String? _sending;
+
+  @override
+  void initState() {
+    super.initState();
+    _reporter.reportedIds().then((s) {
+      if (mounted) setState(() => _reported = s);
+    });
+  }
+
+  Future<void> _authorise(RoadEvent e) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tr('Report this violation?')),
+        content: Text(tr('This sends the photo with the number plate, the plate number, the time and where it happened to the reporting service. Check the photo first.')),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(tr('Cancel'))),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(tr('Authorise and report'))),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _sending = e.id);
+    final r = await _reporter.report(e);
+    if (!mounted) return;
+    setState(() {
+      _sending = null;
+      if (r.ok) _reported = {..._reported, e.id};
+    });
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(r.ok ? tr('Report sent') : tr('Couldn\'t send the report. Check your internet and try again.')),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
+    final events = widget.events;
     final potholes = events.where((e) => e.type == 'pothole').length;
     final triple = events.where((e) => e.type == 'triple_riding').length;
     final noHelmet = events.where((e) => e.type == 'no_helmet').length;
@@ -32,7 +79,15 @@ class DriveReportScreen extends StatelessWidget {
             subtitle: tr('{p} potholes, {t} triple riding, {h} without helmets', {'p': '$potholes', 't': '$triple', 'h': '$noHelmet'}),
           ),
           const SizedBox(height: 20),
-          for (final e in events.reversed) ...[_EventCard(e), const SizedBox(height: 12)],
+          for (final e in events.reversed) ...[
+            _EventCard(
+              e,
+              block: ViolationReporter.check(e, configured: _reporter.configured, alreadyReported: _reported.contains(e.id)),
+              sending: _sending == e.id,
+              onAuthorise: _sending == null ? () => _authorise(e) : null,
+            ),
+            const SizedBox(height: 12),
+          ],
           FootNote(tr('Photos and locations stay on this phone and are deleted after 7 days. A suggestion, not proof: check each photo.')),
         ]),
       ),
@@ -41,15 +96,49 @@ class DriveReportScreen extends StatelessWidget {
 }
 
 class _EventCard extends StatelessWidget {
-  const _EventCard(this.e);
+  const _EventCard(this.e, {required this.block, required this.sending, required this.onAuthorise});
 
   final RoadEvent e;
+  final ReportBlock block;
+  final bool sending;
+  final VoidCallback? onAuthorise;
 
   String get _title => switch (e.type) {
         'triple_riding' => tr('Triple riding'),
         'no_helmet' => tr('Rider without helmet'),
-        _ => tr('Pothole'),
+        'pothole' => tr('Pothole'),
+        _ => 'Capture test', // lab only: from the adb test hook
       };
+
+  /// The reporting line under a violation: a button when it can be sent, otherwise the reason it can't.
+  Widget? _reporting() {
+    switch (block) {
+      case ReportBlock.notConfigured:
+      case ReportBlock.notAViolation:
+        return null;
+      case ReportBlock.none:
+        return Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.icon(
+            icon: sending
+                ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2, color: DL.onDark))
+                : const Icon(Icons.outbox_outlined, size: 18),
+            label: Text(sending ? tr('Sending...') : tr('Authorise and report')),
+            onPressed: onAuthorise,
+          ),
+        );
+      case ReportBlock.alreadyReported:
+        return Row(children: [
+          const Icon(Icons.check_circle_outline, size: 18, color: DL.success),
+          const SizedBox(width: 6),
+          Text(tr('Reported'), style: DLText.small.copyWith(color: DL.success)),
+        ]);
+      case ReportBlock.plateNotClear:
+        return Text(tr('Plate not clear enough to report'), style: DLText.small);
+      case ReportBlock.noLocation:
+        return Text(tr('No location was recorded, so it can\'t be reported'), style: DLText.small);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,6 +149,7 @@ class _EventCard extends StatelessWidget {
             : e.plateValid
                 ? tr('Plate: {p}', {'p': e.plateText})
                 : tr('Plate: {p} (check it)', {'p': e.plateText});
+    final reporting = _reporting();
     return SectionCard(
       padding: EdgeInsets.zero,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -91,6 +181,7 @@ class _EventCard extends StatelessWidget {
                 onPressed: () => launchUrl(Uri.parse('geo:${e.lat},${e.lon}?q=${e.lat},${e.lon}(${Uri.encodeComponent(_title)})')),
               ),
             ],
+            if (reporting != null) ...[const SizedBox(height: 12), reporting],
           ]),
         ),
       ]),

@@ -40,6 +40,11 @@ class Config {
   /// none set the app runs as before, on realtime only.
   ///   --dart-define=FIREBASE_API_KEY=... --dart-define=FIREBASE_APP_ID=...
   ///   --dart-define=FIREBASE_SENDER_ID=... --dart-define=FIREBASE_PROJECT_ID=...
+  /// Where an authorised traffic-violation report goes (a webhook that accepts a multipart POST).
+  /// Empty means this build offers no reporting. Keep the real address out of the repository:
+  ///   --dart-define=VIOLATION_WEBHOOK_URL=https://...
+  static const violationWebhookUrl = String.fromEnvironment('VIOLATION_WEBHOOK_URL');
+
   static const firebaseApiKey = String.fromEnvironment('FIREBASE_API_KEY');
   static const firebaseAppId = String.fromEnvironment('FIREBASE_APP_ID');
   static const firebaseSenderId = String.fromEnvironment('FIREBASE_SENDER_ID');

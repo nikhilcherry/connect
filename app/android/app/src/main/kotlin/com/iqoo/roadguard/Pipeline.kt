@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.util.Log
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.Executors
 
 data class Flag(val box: RectF, val label: String, val severe: Boolean)
@@ -37,6 +38,8 @@ class PipelineStats {
     @Volatile var helmetChecks = 0L
     @Volatile var helmetSeen = 0L
     @Volatile var noHelmetSeen = 0L
+    @Volatile var aiConfirms = 0
+    @Volatile var aiVetoes = 0
 }
 
 /**
@@ -50,6 +53,8 @@ class Pipeline(private val ctx: Context) {
     val location = LocationTracker(ctx)
     val evidence = EvidenceStore(ctx, location)
     val stats = PipelineStats()
+    val ai = AiVerifier()
+    private val hiRes = PlateHiRes { if (::plate.isInitialized) plate else null }
 
     @Volatile var ready = false
         private set
@@ -106,6 +111,8 @@ class Pipeline(private val ctx: Context) {
         closed = true
         ready = false
         location.stop()
+        ai.close()
+        hiRes.close()
         gpuExec.shutdown()
         cpuExec.shutdown()
         evidence.close()
@@ -203,7 +210,32 @@ class Pipeline(private val ctx: Context) {
 
             tr.tripleHits = if (riders.size >= 3) minOf(tr.tripleHits + 1, 10) else maxOf(tr.tripleHits - 1, 0)
 
-            val seatedRiders = persons.filter { isRider(it.box, bike.box, seated = true) }
+            // AI second opinion (opt-in): one cropped photo of this vehicle, once, when it looks like it
+            // carries two or more people. The AI then decides; on-device rules are the fallback.
+            val aiActive = ai.enabled && ai.available && level < 2
+            val seated = persons.filter { isRider(it.box, bike.box, seated = true) }
+            val crowded = riders.size >= 2
+            val helmetSuspect = seated.isNotEmpty() && tr.noHelmetHits >= 2
+            if (aiActive && tr.aiState == 0 && (crowded || helmetSuspect) && tr.observations >= 3 &&
+                bike.box.width() >= 80f && bike.box.bottom < 0.97f * frame.height
+            ) {
+                // Crop = the bike plus the people actually seated on it (not bystanders). Too small a crop
+                // has no detail for the AI to judge, so it is not sent.
+                val union = RectF(bike.box)
+                (if (seated.size >= 2 || !crowded) seated else riders).forEach { union.union(it.box) }
+                val c = if (union.width() >= 100f && union.height() >= 100f) crop(frame, union, 0.08f) else null
+                if (c != null) {
+                    tr.aiState = 1
+                    tr.aiAskedAtMs = nowMs
+                    val asked = ai.submit(encodeForAi(c.bmp)) { v ->
+                        tr.aiVerdict = v
+                        tr.aiState = if (v != null) 2 else 3
+                    }
+                    if (!asked) tr.aiState = 0 // not now (rate limit or cap); try again on a later frame
+                }
+            }
+
+            val seatedRiders = seated
             if (level == 0 && seatedRiders.isNotEmpty() && !tr.firedNoHelmet &&
                 tr.observations - tr.lastHelmetCheck >= 2 && bike.box.width() >= 90f &&
                 bike.box.bottom < 0.97f * frame.height // a bike cut off by the frame edge is too uncertain
@@ -225,13 +257,35 @@ class Pipeline(private val ctx: Context) {
                 }
             }
 
-            if (!tr.firedTriple && tr.tripleHits >= 4) {
-                tr.firedTriple = true
-                if (fire("triple_riding", tr, bike, frame, nowMs, "riders=${riders.size}")) stats.tripleEvents++
-            }
-            if (!tr.firedNoHelmet && tr.noHelmetHits >= 3) {
-                tr.firedNoHelmet = true
-                if (fire("no_helmet", tr, bike, frame, nowMs, "riders=${seatedRiders.size}")) stats.noHelmetEvents++
+            val v = tr.aiVerdict
+            val aiWaiting = aiActive && tr.aiState == 1 && nowMs - tr.aiAskedAtMs < 8000
+            if (aiActive && tr.aiState == 2 && v != null) {
+                // The AI decides for this vehicle. Only a confident answer fires an event.
+                val sure = v.confidence >= 0.75
+                val note = "ai: people=${v.people} helmets=${v.helmets.joinToString("") { if (it) "H" else "x" }} conf=${v.confidence}"
+                if (sure && v.people >= 3 && !tr.firedTriple) {
+                    tr.firedTriple = true
+                    if (fire("triple_riding", tr, bike, frame, nowMs, note)) stats.tripleEvents++
+                }
+                if (sure && v.people >= 1 && v.anyBareHead && !tr.firedNoHelmet) {
+                    tr.firedNoHelmet = true
+                    if (fire("no_helmet", tr, bike, frame, nowMs, note)) stats.noHelmetEvents++
+                }
+                if (!tr.aiCounted) {
+                    tr.aiCounted = true
+                    val onDeviceWouldFire = tr.tripleHits >= 4 || tr.noHelmetHits >= 3
+                    val aiFires = sure && (v.people >= 3 || v.anyBareHead)
+                    if (aiFires) stats.aiConfirms++ else if (onDeviceWouldFire) stats.aiVetoes++
+                }
+            } else if (!aiWaiting) {
+                if (!tr.firedTriple && tr.tripleHits >= 4 && bike.box.width() >= 70f) {
+                    tr.firedTriple = true
+                    if (fire("triple_riding", tr, bike, frame, nowMs, "riders=${riders.size}")) stats.tripleEvents++
+                }
+                if (!tr.firedNoHelmet && tr.noHelmetHits >= 3) {
+                    tr.firedNoHelmet = true
+                    if (fire("no_helmet", tr, bike, frame, nowMs, "riders=${seatedRiders.size}")) stats.noHelmetEvents++
+                }
             }
 
             if (tr.firedTriple) addFlag(flags, Flag(bike.box, "TRIPLE RIDING", true))
@@ -240,6 +294,15 @@ class Pipeline(private val ctx: Context) {
         }
         if (helmetMs > 0f) stats.helmetMs = helmetMs
         return flags
+    }
+
+    /** Shrink the crop to at most 512 px: enough for the AI to see heads, cheap to upload. */
+    private fun encodeForAi(b: Bitmap): ByteArray {
+        val k = minOf(1f, 512f / maxOf(b.width, b.height))
+        val s = if (k < 1f) Bitmap.createScaledBitmap(b, maxOf(1, (b.width * k).toInt()), maxOf(1, (b.height * k).toInt()), true) else b
+        val out = ByteArrayOutputStream(40_000)
+        s.compress(Bitmap.CompressFormat.JPEG, 82, out)
+        return out.toByteArray()
     }
 
     private class Recent(val type: String, val box: RectF, val ts: Long)
@@ -251,6 +314,26 @@ class Pipeline(private val ctx: Context) {
         if (recent.any { it.type == type && IouTracker.iou(it.box, box) > 0.25f }) return true
         recent.add(Recent(type, RectF(box), nowMs))
         return false
+    }
+
+    /**
+     * Test hook (adb): run the full-resolution pass on the middle of the current view, as if a violation
+     * had fired there, and save the result as a `capture_test` event. Point the phone at a number plate.
+     */
+    fun testHiRes(): Boolean {
+        val src = Hub.stillSource ?: return false
+        val f = Hub.lastFrame ?: return false
+        val box = RectF(f.width * 0.15f, f.height * 0.2f, f.width * 0.85f, f.height * 0.8f)
+        val now = System.currentTimeMillis()
+        val locNow = location.last
+        val snapshot = f.copy(Bitmap.Config.ARGB_8888, false)
+        return hiRes.start(src, f.width, f.height, { RectF(box) }) { hr ->
+            evidence.save(
+                "capture_test", 0, 0f, now, snapshot, hr?.plateCrop, "capture test", withClip = false,
+                plateText = hr?.plateText, plateValid = hr?.plateValid ?: false,
+                eventMs = now, vehicle = hr?.vehicle, plateHiRes = hr?.plateCrop != null, locationAtEvent = locNow,
+            )
+        }
     }
 
     /** Two tracks on the same bike must not stack two identical labels. */
@@ -288,10 +371,27 @@ class Pipeline(private val ctx: Context) {
         val marks = ArrayList<Triple<RectF, String, Int>>()
         marks.add(Triple(bike.box, label, Color.rgb(255, 120, 0)))
         plateBoxInFrame?.let { marks.add(Triple(it, "plate", Color.GREEN)) }
-        evidence.save(
-            type, tr.id, bike.score, nowMs, annotate(frame, marks), plateCrop, note, withClip = true,
-            plateText = plate?.text, plateValid = plate?.valid ?: false,
-        )
+        val annotated = annotate(frame, marks)
+        val locNow = location.last
+        // A violation is confirmed: take a full-resolution still and read the plate from that. The event
+        // is saved when that finishes (about a second); if it cannot run, save it now as before.
+        val source = Hub.stillSource
+        val upgraded = source != null && level < 2 && hiRes.start(source, frame.width, frame.height, { RectF(tr.box) }) { hr ->
+            val useHr = hr?.plateCrop != null && (hr.plateValid || plate?.valid != true)
+            evidence.save(
+                type, tr.id, bike.score, nowMs, annotated, if (useHr) hr?.plateCrop else plateCrop,
+                note + if (hr != null) " | hires" else "", withClip = true,
+                plateText = if (useHr) hr?.plateText else plate?.text,
+                plateValid = if (useHr) hr?.plateValid ?: false else plate?.valid ?: false,
+                eventMs = nowMs, vehicle = hr?.vehicle, plateHiRes = useHr, locationAtEvent = locNow,
+            )
+        }
+        if (!upgraded) {
+            evidence.save(
+                type, tr.id, bike.score, nowMs, annotated, plateCrop, note, withClip = true,
+                plateText = plate?.text, plateValid = plate?.valid ?: false, locationAtEvent = locNow,
+            )
+        }
         stats.violations++
         stats.lastEvent = "$label #${tr.id}" + when {
             plate != null && plate.text.isNotEmpty() -> " " + plate.text
