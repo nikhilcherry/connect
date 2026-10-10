@@ -252,20 +252,12 @@ class _SosButton extends StatelessWidget {
               decoration: BoxDecoration(
                 color: DL.error,
                 shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: DL.error.withValues(alpha: 0.35),
-                    offset: const Offset(0, 4),
-                    blurRadius: 10,
-                  ),
-                ],
-                border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1.5),
               ),
               alignment: Alignment.center,
               child: Text(
                 'SOS',
                 style: DLText.label.copyWith(
-                  color: Colors.white,
+                  color: DL.onDark,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.2,
                   fontSize: 13,
@@ -314,11 +306,6 @@ void _showEmergencySheet(BuildContext context, AppState s) {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(tr('Emergency contacts'), style: DLText.section),
-                      const SizedBox(height: 2),
-                      Text(
-                        tr('Police, fire, ambulance'),
-                        style: DLText.small,
-                      ),
                     ],
                   ),
                 ),

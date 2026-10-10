@@ -133,10 +133,14 @@ class _CarPhotoScreenState extends State<CarPhotoScreen> {
         'height_mm': spec?.heightMm,
         'details': {...car.toDetails(), ...res.toDetails()},
       };
-      if (widget.addAnother) {
-        await s.addVehicle(fields);
-      } else {
-        await s.saveVehicle(fields);
+      Future<void> store(Map<String, dynamic> f) => widget.addAnother ? s.addVehicle(f) : s.saveVehicle(f);
+      try {
+        await store(fields);
+      } catch (e) {
+        // A server that hasn't had the `details` migration yet must not stop
+        // onboarding: save the car without the extra info.
+        if (!e.toString().contains('details')) rethrow;
+        await store({...fields}..remove('details'));
       }
       if (!mounted) return;
       if (widget.addAnother) {
