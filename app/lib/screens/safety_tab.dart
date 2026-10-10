@@ -13,10 +13,12 @@ import '../config.dart';
 import '../l10n.dart';
 import '../main.dart';
 import '../services/crash_detector.dart';
+import '../services/roadguard.dart';
 import '../services/trip_share.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/motion.dart';
+import 'drive_report_screen.dart';
 import 'medical_screen.dart';
 import 'witness_screen.dart';
 
@@ -43,6 +45,20 @@ class SafetyTab extends StatelessWidget {
             Text(
               tr('Keep the app open on your phone mount. If your phone feels a crash-level impact, you get 15 seconds to cancel before your emergency contacts are messaged with your location.'),
               style: DLText.body.copyWith(color: DL.muted),
+            ),
+            const SizedBox(height: 14),
+            ValueListenableBuilder<bool>(
+              valueListenable: RoadGuard.enabled,
+              builder: (_, on, _) => Row(children: [
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(tr('Scan the road with the camera'), style: DLText.body.copyWith(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    Text(tr('Finds potholes, triple riding and riders without helmets. Everything stays on this phone.'), style: DLText.small),
+                  ]),
+                ),
+                Switch(value: on, onChanged: RoadGuard.setEnabled),
+              ]),
             ),
             const SizedBox(height: 16),
             SizedBox(
@@ -296,18 +312,78 @@ class _DriveModeScreenState extends State<DriveModeScreen> with SingleTickerProv
   bool _sent = false;
   bool _test = false;
 
+  // Road scan (potholes, triple riding, no helmet) runs alongside crash detection.
+  _RoadState _roadState = _RoadState.off;
+  RoadStatus? _road;
+  Timer? _roadTimer;
+  Timer? _previewTimer;
+  bool _previewBusy = false;
+  Uint8List? _frame;
+  // Not `late`: it must be stamped when Drive Mode opens, not when Stop first reads it.
+  final DateTime _startedAt = DateTime.now();
+
   @override
   void initState() {
     super.initState();
     _detector.start();
+    _startRoad();
   }
 
   @override
   void dispose() {
     _detector.stop();
+    _roadTimer?.cancel();
+    _previewTimer?.cancel();
+    RoadGuard.stop();
     _countdown?.cancel();
     _ring.dispose();
     super.dispose();
+  }
+
+  Future<void> _startRoad() async {
+    if (!RoadGuard.enabled.value) return;
+    setState(() => _roadState = _RoadState.starting);
+    final ok = await RoadGuard.start();
+    if (!mounted) {
+      RoadGuard.stop();
+      return;
+    }
+    if (!ok) {
+      final supported = await RoadGuard.available();
+      if (mounted) setState(() => _roadState = supported ? _RoadState.denied : _RoadState.unavailable);
+      return;
+    }
+    setState(() => _roadState = _RoadState.running);
+    _roadTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
+      final st = await RoadGuard.status();
+      if (mounted && st != null) setState(() => _road = st);
+    });
+    // The live view: a few frames a second, rendered natively only when asked for.
+    _previewTimer = Timer.periodic(const Duration(milliseconds: 250), (_) async {
+      if (_previewBusy) return;
+      _previewBusy = true;
+      final f = await RoadGuard.preview();
+      _previewBusy = false;
+      if (mounted && f != null) setState(() => _frame = f);
+    });
+  }
+
+  /// Stop: collect what the scan caught, shut it down, and show the report if there is one.
+  Future<void> _stopDrive() async {
+    _roadTimer?.cancel();
+    _previewTimer?.cancel();
+    var found = const <RoadEvent>[];
+    if (_roadState == _RoadState.running) {
+      found = await RoadGuard.events(_startedAt);
+      await RoadGuard.stop();
+    }
+    if (!mounted) return;
+    final nav = Navigator.of(context);
+    if (found.isEmpty) {
+      nav.pop();
+    } else {
+      nav.pushReplacement(MaterialPageRoute(builder: (_) => DriveReportScreen(events: found)));
+    }
   }
 
   void _onCrash(double g, {bool test = false}) {
@@ -360,16 +436,22 @@ class _DriveModeScreenState extends State<DriveModeScreen> with SingleTickerProv
               if (!counting)
                 TextButton(
                   style: TextButton.styleFrom(foregroundColor: DL.onDark),
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: _stopDrive,
                   child: Text(tr('Stop')),
                 ),
             ]),
-            const Spacer(),
-            Swap(
-              alignment: Alignment.center,
-              child: counting ? _countdownView(key: const ValueKey('count')) : _watchingView(key: ValueKey('watch-$_sent')),
+            // The middle scrolls when the live view makes it taller than the screen, so nothing overflows.
+            Expanded(
+              child: Center(
+                child: SingleChildScrollView(
+                  child: Swap(
+                    alignment: Alignment.center,
+                    child: counting ? _countdownView(key: const ValueKey('count')) : _watchingView(key: ValueKey('watch-$_sent')),
+                  ),
+                ),
+              ),
             ),
-            const Spacer(),
+            const SizedBox(height: 12),
             Swap(
               alignment: Alignment.bottomCenter,
               child: counting
@@ -456,6 +538,7 @@ class _DriveModeScreenState extends State<DriveModeScreen> with SingleTickerProv
             textAlign: TextAlign.center,
           ),
         ),
+        if (_roadState != _RoadState.off) ...[const SizedBox(height: 28), _RoadPanel(state: _roadState, status: _road, frame: _frame)],
       ]);
 }
 
@@ -645,4 +728,103 @@ class TripBanner extends StatelessWidget {
       ),
     );
   }
+}
+
+enum _RoadState { off, starting, running, unavailable, denied }
+
+/// Road scan on Drive Mode's dark screen, in one card: the live camera view with what the models
+/// found drawn on it, what the scan is doing, and the counts so far.
+class _RoadPanel extends StatelessWidget {
+  const _RoadPanel({required this.state, required this.status, required this.frame});
+
+  final _RoadState state;
+  final RoadStatus? status;
+  final Uint8List? frame;
+
+  static String? _lastLabel(String last) {
+    final l = last.toLowerCase();
+    if (l.startsWith('triple')) return tr('Triple riding');
+    if (l.startsWith('no helmet')) return tr('Rider without helmet');
+    if (l.startsWith('pothole')) return tr('Pothole');
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = status;
+    final live = state == _RoadState.running && s != null && s.ready;
+    final line = switch (state) {
+      _RoadState.off => tr('Road scan is off'),
+      _RoadState.starting => tr('Road scan: starting...'),
+      _RoadState.unavailable => tr('Road scan isn\'t available on this phone.'),
+      _RoadState.denied => tr('Allow camera access to scan the road.'),
+      _RoadState.running => !live
+          ? tr('Road scan: loading...')
+          : s.paused
+              ? tr('Paused to cool the phone')
+              : s.thermal >= 2
+                  ? tr('Phone is warm: scanning slower')
+                  : tr('Scanning the road'),
+    };
+    final last = live ? _lastLabel(s.last) : null;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 520),
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(DL.rCard),
+          border: Border.all(color: DL.muted),
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          if (state == _RoadState.running)
+            SizedBox(
+              height: 320,
+              width: double.infinity,
+              child: frame == null
+                  ? const ColoredBox(color: Colors.black, child: Center(child: SizedBox.square(dimension: 22, child: CircularProgressIndicator(strokeWidth: 2, color: DL.onDarkMuted))))
+                  : Stack(fit: StackFit.expand, children: [
+                      ColoredBox(color: Colors.black, child: Image.memory(frame!, fit: BoxFit.contain, gaplessPlayback: true)),
+                      if (s != null && s.demo)
+                        Positioned(
+                          left: 8,
+                          top: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            color: DL.error,
+                            child: Text(tr('Test feed, not the camera'), style: DLText.small.copyWith(color: DL.onDark, fontWeight: FontWeight.w700)),
+                          ),
+                        ),
+                    ]),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(Icons.videocam_outlined, size: 18, color: live ? DL.onDark : DL.onDarkMuted),
+                const SizedBox(width: 8),
+                Flexible(child: Text(line, style: DLText.body.copyWith(color: DL.onDark))),
+              ]),
+              if (live) ...[
+                const SizedBox(height: 12),
+                Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+                  _count(tr('Potholes'), s.potholes),
+                  _count(tr('Violations'), s.violations),
+                ]),
+                if (last != null) ...[
+                  const SizedBox(height: 10),
+                  Text(tr('Last: {x}', {'x': last}), style: DLText.small.copyWith(color: DL.onDarkMuted)),
+                ],
+              ],
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _count(String label, int n) => Column(children: [
+        Text('$n', style: DLText.title.copyWith(color: DL.onDark)),
+        const SizedBox(height: 2),
+        Text(label, style: DLText.small.copyWith(color: DL.onDarkMuted)),
+      ]);
 }
