@@ -526,6 +526,7 @@
  "Share": "ಹಂಚಿಕೊಳ್ಳಿ",
  "Share a live trip": "ಲೈವ್ ಪ್ರಯಾಣ ಹಂಚಿಕೊಳ್ಳಿ",
  "Share alerts with people who also drive this car": "ಈ ಕಾರು ಓಡಿಸುವವರೊಂದಿಗೆ ಅಲರ್ಟ್ ಹಂಚಿಕೊಳ್ಳಿ",
+ "Share evidence": "ಸಾಕ್ಷ್ಯ ಹಂಚಿಕೊಳ್ಳಿ",
  "Share for": "ಎಷ್ಟು ಹೊತ್ತು ಹಂಚಿಕೊಳ್ಳಬೇಕು",
  "Share link": "ಲಿಂಕ್ ಹಂಚಿಕೊಳ್ಳಿ",
  "Share service history (PDF)": "ಸರ್ವಿಸ್ ಇತಿಹಾಸ ಹಂಚಿಕೊಳ್ಳಿ (PDF)",
@@ -722,6 +723,8 @@
  "e.g. Oil change, brake pads": "ಉದಾ. ಆಯಿಲ್ ಬದಲಾವಣೆ, ಬ್ರೇಕ್ ಪ್ಯಾಡ್",
  "e.g. Prestige Lakeside, Tower B": "ಉದಾ. ಪ್ರೆಸ್ಟೀಜ್ ಲೇಕ್‌ಸೈಡ್, ಟವರ್ B",
  "just now": "ಈಗಷ್ಟೇ",
+ "not read": "ಓದಲಾಗಿಲ್ಲ",
+ "not recorded": "ದಾಖಲಾಗಿಲ್ಲ",
  "of {n} popular cars fit": "{n} ಜನಪ್ರಿಯ ಕಾರುಗಳಲ್ಲಿ ಹಿಡಿಸುತ್ತವೆ",
  "paid until {time}": "{time} ವರೆಗೆ ಪಾವತಿಸಲಾಗಿದೆ",
  "shown on accident reports": "ಅಪಘಾತ ವರದಿಯಲ್ಲಿ ಕಾಣುತ್ತದೆ",
@@ -746,5 +749,6 @@
  "{n} of {max}": "{max} ರಲ್ಲಿ {n}",
  "{n} open": "{n} ತೆರೆದಿವೆ",
  "{n} pages · added {date}": "{n} ಪುಟಗಳು · {date} ರಂದು ಸೇರಿಸಲಾಗಿದೆ",
- "{p} potholes, {t} triple riding, {h} without helmets": "{p} ಗುಂಡಿಗಳು, {t} ಮೂವರ ಸವಾರಿ, {h} ಹೆಲ್ಮೆಟ್ ಇಲ್ಲದೆ"
+ "{p} potholes, {t} triple riding, {h} without helmets": "{p} ಗುಂಡಿಗಳು, {t} ಮೂವರ ಸವಾರಿ, {h} ಹೆಲ್ಮೆಟ್ ಇಲ್ಲದೆ",
+ "{v} on {t}. Plate: {p}. Location: {l}": "{t} ರಂದು {v}. ಪ್ಲೇಟ್: {p}. ಸ್ಥಳ: {l}"
 }

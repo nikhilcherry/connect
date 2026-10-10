@@ -37,11 +37,15 @@ class ReportResult {
 /// latitude and longitude. Only the person who authorises a report triggers a send; nothing here
 /// runs on its own.
 class ViolationReporter {
-  ViolationReporter({String? url, this.timeout = const Duration(seconds: 25)})
-      : url = (url ?? Config.violationWebhookUrl).isEmpty ? null : Uri.parse(url ?? Config.violationWebhookUrl);
+  ViolationReporter({String? url, String? key, this.timeout = const Duration(seconds: 25)})
+      : key = key ?? Config.violationWebhookKey,
+        url = (url ?? Config.violationWebhookUrl).isEmpty ? null : Uri.parse(url ?? Config.violationWebhookUrl);
 
   /// Where reports go, or null if this build has none configured.
   final Uri? url;
+
+  /// Sent as `X-Api-Key` when not empty.
+  final String key;
   final Duration timeout;
 
   static const _prefReported = 'reported_violations';
@@ -129,6 +133,7 @@ class ViolationReporter {
     try {
       final req = await client.postUrl(target);
       req.headers.set(HttpHeaders.contentTypeHeader, 'multipart/form-data; boundary=$boundary');
+      if (key.isNotEmpty) req.headers.set('X-Api-Key', key);
       req.contentLength = body.length;
       req.add(body);
       final resp = await req.close().timeout(timeout);

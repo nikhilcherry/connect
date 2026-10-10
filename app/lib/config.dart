@@ -45,6 +45,10 @@ class Config {
   ///   --dart-define=VIOLATION_WEBHOOK_URL=https://...
   static const violationWebhookUrl = String.fromEnvironment('VIOLATION_WEBHOOK_URL');
 
+  /// Optional secret the reporting service checks (sent as the `X-Api-Key` header), so only this app can post:
+  ///   --dart-define=VIOLATION_WEBHOOK_KEY=...
+  static const violationWebhookKey = String.fromEnvironment('VIOLATION_WEBHOOK_KEY');
+
   static const firebaseApiKey = String.fromEnvironment('FIREBASE_API_KEY');
   static const firebaseAppId = String.fromEnvironment('FIREBASE_APP_ID');
   static const firebaseSenderId = String.fromEnvironment('FIREBASE_SENDER_ID');

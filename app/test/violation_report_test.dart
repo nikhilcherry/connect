@@ -102,7 +102,7 @@ void main() {
       server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       server.listen((req) async {
         final bytes = await req.fold<List<int>>(<int>[], (a, b) => a..addAll(b));
-        received.add({'method': req.method, 'path': req.uri.path, 'type': req.headers.contentType.toString(), 'body': latin1.decode(bytes)});
+        received.add({'key': req.headers.value('x-api-key') ?? '', 'method': req.method, 'path': req.uri.path, 'type': req.headers.contentType.toString(), 'body': latin1.decode(bytes)});
         req.response.statusCode = status;
         await req.response.close();
       });
@@ -141,6 +141,16 @@ void main() {
       expect(body, contains('name="latitude"\r\n\r\n12.9716'));
       expect(body, contains('name="frame"; filename="frame.jpg"'));
       expect(body, isNot(contains('name="plate"; filename')));
+    });
+
+    test('the key is sent as X-Api-Key when one is configured, and not otherwise', () async {
+      final withKey = ViolationReporter(url: 'http://127.0.0.1:${server.port}/webhook/traffic-violation', key: 's3cret');
+      expect((await withKey.report(event())).ok, isTrue);
+      expect(received.single['key'], 's3cret');
+      received.clear();
+      final noKey = ViolationReporter(url: 'http://127.0.0.1:${server.port}/webhook/traffic-violation', key: '');
+      expect((await noKey.report(_event(id: 'no_helmet_00009', framePath: '${dir.path}/frame.jpg', platePath: '${dir.path}/plate.jpg'))).ok, isTrue);
+      expect(received.single['key'], '');
     });
 
     test('it is remembered as reported and is not sent twice', () async {

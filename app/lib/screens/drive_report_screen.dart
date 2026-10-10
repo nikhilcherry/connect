@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n.dart';
@@ -35,6 +36,26 @@ class _DriveReportScreenState extends State<DriveReportScreen> {
     _reporter.reportedIds().then((s) {
       if (mounted) setState(() => _reported = s);
     });
+  }
+
+  /// Hands the evidence to any app, for example a city police reporting app: the photos and a message with
+  /// the violation, time, plate and a map link. Nothing is sent by this app itself.
+  Future<void> _share(RoadEvent e, String title) async {
+    final files = <XFile>[
+      for (final path in [e.framePath, e.platePath, e.vehiclePath])
+        if (path != null && File(path).existsSync()) XFile(path, mimeType: 'image/jpeg'),
+    ];
+    final plate = e.plateText.isEmpty ? tr('not read') : e.plateText;
+    final where = e.hasLocation ? 'https://maps.google.com/?q=${e.lat},${e.lon}' : tr('not recorded');
+    await SharePlus.instance.share(ShareParams(
+      files: files,
+      text: tr('{v} on {t}. Plate: {p}. Location: {l}', {
+        'v': title,
+        't': DateFormat('d MMM y, h:mm a').format(e.time),
+        'p': plate,
+        'l': where,
+      }),
+    ));
   }
 
   Future<void> _authorise(RoadEvent e) async {
@@ -85,6 +106,7 @@ class _DriveReportScreenState extends State<DriveReportScreen> {
               block: ViolationReporter.check(e, configured: _reporter.configured, alreadyReported: _reported.contains(e.id)),
               sending: _sending == e.id,
               onAuthorise: _sending == null ? () => _authorise(e) : null,
+              onShare: (title) => _share(e, title),
             ),
             const SizedBox(height: 12),
           ],
@@ -96,12 +118,13 @@ class _DriveReportScreenState extends State<DriveReportScreen> {
 }
 
 class _EventCard extends StatelessWidget {
-  const _EventCard(this.e, {required this.block, required this.sending, required this.onAuthorise});
+  const _EventCard(this.e, {required this.block, required this.sending, required this.onAuthorise, required this.onShare});
 
   final RoadEvent e;
   final ReportBlock block;
   final bool sending;
   final VoidCallback? onAuthorise;
+  final void Function(String title) onShare;
 
   String get _title => switch (e.type) {
         'triple_riding' => tr('Triple riding'),
@@ -171,13 +194,22 @@ class _EventCard extends StatelessWidget {
               Text(DateFormat.jm().format(e.time), style: DLText.small),
             ]),
             if (plate != null) ...[const SizedBox(height: 6), Text(plate, style: DLText.body.copyWith(color: DL.muted))],
-            if (e.lat != null && e.lon != null) ...[
+            if (e.hasLocation || e.isViolation) ...[
               const SizedBox(height: 10),
-              OutlinedButton.icon(
-                icon: const Icon(Icons.place_outlined, size: 18),
-                label: Text(tr('Open map')),
-                onPressed: () => launchUrl(Uri.parse('geo:${e.lat},${e.lon}?q=${e.lat},${e.lon}(${Uri.encodeComponent(_title)})')),
-              ),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                if (e.hasLocation)
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.place_outlined, size: 18),
+                    label: Text(tr('Open map')),
+                    onPressed: () => launchUrl(Uri.parse('geo:${e.lat},${e.lon}?q=${e.lat},${e.lon}(${Uri.encodeComponent(_title)})')),
+                  ),
+                if (e.isViolation)
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.ios_share, size: 18),
+                    label: Text(tr('Share evidence')),
+                    onPressed: () => onShare(_title),
+                  ),
+              ]),
             ],
             if (reporting != null) ...[const SizedBox(height: 12), reporting],
           ]),

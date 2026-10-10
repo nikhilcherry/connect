@@ -526,6 +526,7 @@
  "Share": "பகிர்",
  "Share a live trip": "நேரலைப் பயணத்தைப் பகிர்",
  "Share alerts with people who also drive this car": "இந்தக் காரை ஓட்டுபவர்களுடன் எச்சரிக்கைகளைப் பகிருங்கள்",
+ "Share evidence": "ஆதாரத்தைப் பகிரவும்",
  "Share for": "எவ்வளவு நேரம் பகிர",
  "Share link": "இணைப்பைப் பகிர்",
  "Share service history (PDF)": "சர்வீஸ் வரலாற்றைப் பகிர் (PDF)",
@@ -722,6 +723,8 @@
  "e.g. Oil change, brake pads": "எ.கா. ஆயில் மாற்றம், பிரேக் பேட்",
  "e.g. Prestige Lakeside, Tower B": "எ.கா. பிரெஸ்டீஜ் லேக்சைட், டவர் B",
  "just now": "இப்போதுதான்",
+ "not read": "படிக்க முடியவில்லை",
+ "not recorded": "பதிவாகவில்லை",
  "of {n} popular cars fit": "{n} பிரபலமான கார்களில் பொருந்துபவை",
  "paid until {time}": "{time} வரை கட்டணம் செலுத்தப்பட்டது",
  "shown on accident reports": "விபத்துப் புகார்களில் காட்டப்படும்",
@@ -746,5 +749,6 @@
  "{n} of {max}": "{max} இல் {n}",
  "{n} open": "{n} திறந்தவை",
  "{n} pages · added {date}": "{n} பக்கங்கள் · {date} அன்று சேர்க்கப்பட்டது",
- "{p} potholes, {t} triple riding, {h} without helmets": "{p} குழிகள், {t} மூவர் பயணம், {h} ஹெல்மெட் இல்லாமல்"
+ "{p} potholes, {t} triple riding, {h} without helmets": "{p} குழிகள், {t} மூவர் பயணம், {h} ஹெல்மெட் இல்லாமல்",
+ "{v} on {t}. Plate: {p}. Location: {l}": "{t} அன்று {v}. பலகை: {p}. இடம்: {l}"
 }

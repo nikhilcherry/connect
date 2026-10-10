@@ -526,6 +526,7 @@
  "Share": "शेयर करें",
  "Share a live trip": "लाइव ट्रिप साझा करें",
  "Share alerts with people who also drive this car": "अलर्ट उनके साथ साझा करें जो यह गाड़ी चलाते हैं",
+ "Share evidence": "सबूत साझा करें",
  "Share for": "कितनी देर साझा करें",
  "Share link": "लिंक शेयर करें",
  "Share service history (PDF)": "सर्विस हिस्ट्री शेयर करें (PDF)",
@@ -722,6 +723,8 @@
  "e.g. Oil change, brake pads": "जैसे, ऑयल बदला, ब्रेक पैड",
  "e.g. Prestige Lakeside, Tower B": "जैसे, प्रेस्टीज लेकसाइड, टावर B",
  "just now": "अभी",
+ "not read": "पढ़ी नहीं गई",
+ "not recorded": "दर्ज नहीं हुई",
  "of {n} popular cars fit": "{n} लोकप्रिय गाड़ियों में से फ़िट",
  "paid until {time}": "{time} तक का भुगतान",
  "shown on accident reports": "दुर्घटना की सूचना पर दिखता है",
@@ -746,5 +749,6 @@
  "{n} of {max}": "{max} में से {n}",
  "{n} open": "{n} खुले",
  "{n} pages · added {date}": "{n} पेज · {date} को जोड़ा",
- "{p} potholes, {t} triple riding, {h} without helmets": "{p} गड्ढे, {t} तीन सवारी, {h} बिना हेलमेट"
+ "{p} potholes, {t} triple riding, {h} without helmets": "{p} गड्ढे, {t} तीन सवारी, {h} बिना हेलमेट",
+ "{v} on {t}. Plate: {p}. Location: {l}": "{t} को {v}। प्लेट: {p}। स्थान: {l}"
 }
