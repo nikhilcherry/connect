@@ -140,10 +140,12 @@ class ViolationReporter {
         await _markReported(e.id);
         return const ReportResult(true);
       }
+      debugPrint('violation report ${e.id} rejected: HTTP ${resp.statusCode}');
       return ReportResult(false, 'HTTP ${resp.statusCode}');
     } on TimeoutException {
       return const ReportResult(false, 'timeout');
     } catch (err) {
+      debugPrint('violation report ${e.id} failed: $err');
       return ReportResult(false, '$err');
     } finally {
       client.close(force: true);

@@ -196,3 +196,21 @@ camera sees now, to check the plate crop and text.
 ```
 adb shell "run-as <package> am start-foreground-service --user 0 -n <package>/com.iqoo.roadguard.DetectionService -a com.iqoo.roadguard.TEST_CAPTURE"
 ```
+
+## Scanning a video
+
+**Scan a video instead** (under Start Drive Mode on the Safety tab) opens the phone's video picker and runs
+the road scan on that video in place of the camera, for one drive. Frames are taken about every 66 ms of
+video time, up to 1280 px on the long side, and the video loops until you stop. The live card is labelled
+"Test feed, not the camera". There is no full-resolution still in this mode, so a plate is read from the
+video frame itself.
+
+## AI answers and the evidence photo
+
+The AI takes a second or two to answer. A vehicle that has moved or fallen by then may have a new track,
+so answers are queued and acted on at the next frame, at the vehicle's last known place. The event's
+photo is the frame the AI was asked about, not the later frame the answer arrived on.
+
+Diagnostics: the log prints, once a second, how many bikes and people were seen, the most riders on one
+bike, and the helmet checks with their helmet / no-helmet counts, plus each AI answer
+(`adb logcat -s RoadGuard`).

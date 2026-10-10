@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -24,6 +25,17 @@ import 'witness_screen.dart';
 
 class SafetyTab extends StatelessWidget {
   const SafetyTab({super.key});
+
+  /// Pick a video from the phone and run Drive Mode's road scan on it instead of the camera.
+  Future<void> _scanVideo(BuildContext context) async {
+    XFile? picked;
+    try {
+      picked = await ImagePicker().pickVideo(source: ImageSource.gallery);
+    } catch (_) {}
+    if (picked == null || !context.mounted) return;
+    RoadGuard.videoPath = picked.path;
+    push(context, const DriveModeScreen());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -91,6 +103,15 @@ class SafetyTab extends StatelessWidget {
                 icon: const Icon(Icons.play_arrow_outlined),
                 label: Text(tr('Start Drive Mode')),
                 onPressed: s.contacts.isEmpty ? null : () => push(context, const DriveModeScreen()),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.video_library_outlined),
+                label: Text(tr('Scan a video instead')),
+                onPressed: s.contacts.isEmpty ? null : () => _scanVideo(context),
               ),
             ),
             if (s.contacts.isEmpty) ...[

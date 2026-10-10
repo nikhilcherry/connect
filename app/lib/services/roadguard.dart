@@ -159,6 +159,9 @@ class RoadGuard {
   /// Lab builds only: play frames from this folder instead of opening the camera.
   static String? demoDir;
 
+  /// A video file to scan instead of the camera, for one drive. Cleared when the drive ends.
+  static String? videoPath;
+
   /// The user's choice; on by default.
   static final enabled = ValueNotifier<bool>(true);
 
@@ -203,7 +206,7 @@ class RoadGuard {
   /// Asks for camera access if needed, then starts the scan. False if it could not start.
   static Future<bool> start() async {
     try {
-      return await _channel.invokeMethod<bool>('start', {'demoDir': demoDir, 'ai': aiEnabled.value}) ?? false;
+      return await _channel.invokeMethod<bool>('start', {'demoDir': videoPath ?? demoDir, 'ai': aiEnabled.value}) ?? false;
     } catch (_) {
       return false;
     }
@@ -222,6 +225,7 @@ class RoadGuard {
     try {
       await _channel.invokeMethod<void>('stop');
     } catch (_) {}
+    videoPath = null;
   }
 
   static Future<RoadStatus?> status() async {

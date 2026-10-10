@@ -212,7 +212,11 @@ class CameraRunner(private val context: Context) : StillSource {
                 android.util.Log.i(
                     "RoadGuard", "run fps=%.1f processed=%d violations=%d skipped=%d".format(
                         Hub.fps, pipeline.stats.processed, pipeline.stats.violations, Hub.skipped,
-                    ),
+                    ) + pipeline.stats.let {
+                        " | bikes=%d persons=%d bikeFrames=%d maxRiders=%d helmetChecks=%d helmet=%d noHelmet=%d".format(
+                            it.rawBikes, it.rawPersons, it.bikeFrames, it.maxRiders, it.helmetChecks, it.helmetSeen, it.noHelmetSeen,
+                        )
+                    },
                 )
                 windowFrames = 0
                 windowStartNs = System.nanoTime()

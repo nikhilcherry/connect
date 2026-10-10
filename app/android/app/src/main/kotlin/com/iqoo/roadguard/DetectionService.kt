@@ -20,6 +20,7 @@ import androidx.lifecycle.LifecycleService
 class DetectionService : LifecycleService() {
     private var runner: CameraRunner? = null
     private var demo: DemoRunner? = null
+    private var video: VideoRunner? = null
     private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -53,7 +54,9 @@ class DetectionService : LifecycleService() {
         val demoDir = intent?.getStringExtra("demoDir")
         if (demoDir != null) {
             // Test feed (lab build only): frames from a folder instead of the camera.
-            if (demo == null) demo = DemoRunner(File(demoDir))
+            // A video file the person picked, or a folder of frames (lab).
+            val src = File(demoDir)
+            if (src.isFile) { if (video == null) video = VideoRunner(src) } else if (demo == null) demo = DemoRunner(src)
         } else if (runner == null) {
             runner = CameraRunner(this).also { it.start(this, null) }
         }
@@ -70,6 +73,8 @@ class DetectionService : LifecycleService() {
         runner = null
         demo?.stop()
         demo = null
+        video?.stop()
+        video = null
         wakeLock?.let { if (it.isHeld) it.release() }
         Hub.stop()
         super.onDestroy()

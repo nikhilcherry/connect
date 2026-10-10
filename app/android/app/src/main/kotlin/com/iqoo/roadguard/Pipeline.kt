@@ -33,6 +33,8 @@ class PipelineStats {
     @Volatile var lastEvent = "-"
     @Volatile var processed = 0L
     // Diagnostics for validating the rules on real footage.
+    @Volatile var rawBikes = 0L
+    @Volatile var rawPersons = 0L
     @Volatile var bikeFrames = 0L
     @Volatile var maxRiders = 0
     @Volatile var helmetChecks = 0L
@@ -190,7 +192,10 @@ class Pipeline(private val ctx: Context) {
     // ---- riders: triple riding + helmet ---------------------------------------------------
 
     private fun handleRiders(frame: Bitmap, dets: List<Detection>, nowMs: Long, level: Int): List<Flag> {
+        drainAiAnswers(frame, nowMs)
         val persons = dets.filter { it.cls == PERSON }
+        stats.rawPersons += persons.size
+        stats.rawBikes += dets.count { it.cls == MOTORCYCLE }
         val fArea = frame.width.toFloat() * frame.height
         // Ignore the filmer's own handlebars / mirrors: a motorcycle box that fills the frame.
         val bikes = dets.filter {
@@ -227,9 +232,13 @@ class Pipeline(private val ctx: Context) {
                 if (c != null) {
                     tr.aiState = 1
                     tr.aiAskedAtMs = nowMs
+                    tr.askFrame = frame.copy(Bitmap.Config.ARGB_8888, false)
+                    tr.askBox = RectF(bike.box)
                     val asked = ai.submit(encodeForAi(c.bmp)) { v ->
+                        Log.i("RoadGuard", "ai verdict track=${tr.id}: " + (v?.let { "people=${it.people} helmets=${it.helmets.joinToString("") { h -> if (h) "H" else "x" }} conf=${it.confidence}" } ?: "none"))
                         tr.aiVerdict = v
                         tr.aiState = if (v != null) 2 else 3
+                        if (v != null) aiReady.add(tr) else tr.askFrame = null
                     }
                     if (!asked) tr.aiState = 0 // not now (rate limit or cap); try again on a later frame
                 }
@@ -260,23 +269,7 @@ class Pipeline(private val ctx: Context) {
             val v = tr.aiVerdict
             val aiWaiting = aiActive && tr.aiState == 1 && nowMs - tr.aiAskedAtMs < 8000
             if (aiActive && tr.aiState == 2 && v != null) {
-                // The AI decides for this vehicle. Only a confident answer fires an event.
-                val sure = v.confidence >= 0.75
-                val note = "ai: people=${v.people} helmets=${v.helmets.joinToString("") { if (it) "H" else "x" }} conf=${v.confidence}"
-                if (sure && v.people >= 3 && !tr.firedTriple) {
-                    tr.firedTriple = true
-                    if (fire("triple_riding", tr, bike, frame, nowMs, note)) stats.tripleEvents++
-                }
-                if (sure && v.people >= 1 && v.anyBareHead && !tr.firedNoHelmet) {
-                    tr.firedNoHelmet = true
-                    if (fire("no_helmet", tr, bike, frame, nowMs, note)) stats.noHelmetEvents++
-                }
-                if (!tr.aiCounted) {
-                    tr.aiCounted = true
-                    val onDeviceWouldFire = tr.tripleHits >= 4 || tr.noHelmetHits >= 3
-                    val aiFires = sure && (v.people >= 3 || v.anyBareHead)
-                    if (aiFires) stats.aiConfirms++ else if (onDeviceWouldFire) stats.aiVetoes++
-                }
+                applyAiVerdict(tr, bike, v, frame, nowMs)
             } else if (!aiWaiting) {
                 if (!tr.firedTriple && tr.tripleHits >= 4 && bike.box.width() >= 70f) {
                     tr.firedTriple = true
@@ -294,6 +287,49 @@ class Pipeline(private val ctx: Context) {
         }
         if (helmetMs > 0f) stats.helmetMs = helmetMs
         return flags
+    }
+
+    /**
+     * Acts on the AI's answer for one vehicle. Only a confident answer fires an event. Safe to call more
+     * than once for the same vehicle: each event fires at most once.
+     */
+    private fun applyAiVerdict(tr: Track, liveBike: Detection, v: AiVerdict, liveFrame: Bitmap, nowMs: Long) {
+        // Evidence from the moment the AI was asked, which is what it judged; the answer comes later.
+        val frame = tr.askFrame ?: liveFrame
+        val bike = tr.askBox?.let { Detection(RectF(it), liveBike.score, MOTORCYCLE) } ?: liveBike
+        val sure = v.confidence >= 0.75
+        val note = "ai: people=${v.people} helmets=${v.helmets.joinToString("") { if (it) "H" else "x" }} conf=${v.confidence}"
+        if (sure && v.people >= 3 && !tr.firedTriple) {
+            tr.firedTriple = true
+            if (fire("triple_riding", tr, bike, frame, nowMs, note)) stats.tripleEvents++
+        }
+        if (sure && v.people >= 1 && v.anyBareHead && !tr.firedNoHelmet) {
+            tr.firedNoHelmet = true
+            if (fire("no_helmet", tr, bike, frame, nowMs, note)) stats.noHelmetEvents++
+        }
+        if (!tr.aiCounted) {
+            tr.aiCounted = true
+            val onDeviceWouldFire = tr.tripleHits >= 4 || tr.noHelmetHits >= 3
+            val aiFires = sure && (v.people >= 3 || v.anyBareHead)
+            if (aiFires) stats.aiConfirms++ else if (onDeviceWouldFire) stats.aiVetoes++
+        }
+        tr.askFrame = null
+    }
+
+    /**
+     * The AI takes a second or two to answer, and by then a moving or falling bike may have been given a
+     * new track, so its answer would never be seen. Answers wait here and are acted on at the next frame,
+     * at the vehicle's last known place.
+     */
+    private val aiReady = java.util.concurrent.ConcurrentLinkedQueue<Track>()
+
+    private fun drainAiAnswers(frame: Bitmap, nowMs: Long) {
+        while (true) {
+            val tr = aiReady.poll() ?: break
+            val v = tr.aiVerdict ?: continue
+            if (tr.aiState != 2) continue
+            applyAiVerdict(tr, Detection(RectF(tr.box), v.confidence.toFloat(), MOTORCYCLE), v, frame, nowMs)
+        }
     }
 
     /** Shrink the crop to at most 512 px: enough for the AI to see heads, cheap to upload. */

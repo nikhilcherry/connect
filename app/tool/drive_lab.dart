@@ -27,6 +27,10 @@ Future<void> main() async {
   // AI second opinion: switched on when an `ai.flag` file sits in the app's files folder, so a test can
   // turn it on without tapping. Otherwise the saved choice from the Safety tab switch is used.
   final dir = await getExternalStorageDirectory();
+  // A `demo.flag` file next to `demo/` makes the lab replay the clips in `demo/` instead of the camera.
+  if (dir != null && File('${dir.path}/demo.flag').existsSync() && Directory('${dir.path}/demo').existsSync()) {
+    RoadGuard.demoDir = '${dir.path}/demo';
+  }
   if (dir != null && File('${dir.path}/ai.flag').existsSync()) await RoadGuard.setAiEnabled(true);
   // A client that is never used: nothing here talks to a server.
   final state = AppState(SupabaseClient('http://127.0.0.1:1', 'lab'))
