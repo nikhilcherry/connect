@@ -136,6 +136,16 @@ class Pixels {
     return px;
   }
 
+  /// The whole picture as a PNG file's bytes.
+  Future<Uint8List> toPng() async {
+    final comp = Completer<ui.Image>();
+    ui.decodeImageFromPixels(rgba, width, height, ui.PixelFormat.rgba8888, comp.complete);
+    final img = await comp.future;
+    final png = await img.toByteData(format: ui.ImageByteFormat.png);
+    img.dispose();
+    return png!.buffer.asUint8List();
+  }
+
   /// The RGBA pixels of [box] grown by [pad] (a fraction of its size) on each side.
   Pixels crop(PlateBox box, {double pad = 0.06}) {
     final l = math.max(0, box.left - box.width * pad).floor();

@@ -1,13 +1,15 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
 import 'acoustic_modem.dart';
+import 'device.dart';
 
 /// A frame the microphone heard, and the profile that carried it.
 class HeardFrame {
@@ -43,8 +45,9 @@ class SoundLink {
   static const profiles = [ModemProfile.ultrasonic, ModemProfile.audible];
   static const sampleRate = 48000;
 
-  /// The longest frame is about 2.5 s; five seconds always holds one whole.
+  /// The longest frame is about 2.7 s; five seconds always holds one whole.
   static const _window = sampleRate * 5;
+  static final _longestFrame = (const AcousticModem(ModemProfile.ultrasonic).frameTime(AcousticModem.maxPayload).inMilliseconds * sampleRate) ~/ 1000;
 
   final _player = AudioPlayer();
   final _rec = AudioRecorder();
@@ -69,8 +72,14 @@ class SoundLink {
 
   Future<bool> hasMic() => _rec.hasPermission();
 
-  /// Opens the microphone. Safe to call twice.
-  Future<void> listen() async {
+  Future<void>? _opening;
+
+  /// Opens the microphone. Safe to call twice, even while the first call is
+  /// still waiting for the recorder (a permission prompt resumes the app,
+  /// which asks again).
+  Future<void> listen() => _opening ??= _open().whenComplete(() => _opening = null);
+
+  Future<void> _open() async {
     if (_sub != null) return;
     _len = 0;
     _total = 0;
@@ -177,6 +186,10 @@ class SoundLink {
           _read[profiles[i].name] = origin + f.end;
           if ((hearSelf || !_isEcho(f.payload)) && !_frames.isClosed) _frames.add(HeardFrame(f.payload, profiles[i]));
         }
+        // A frame that began more than one frame-length before the end of this
+        // snapshot was whole and still did not decode: no need to look there again.
+        final settled = origin + snapshot.length - _longestFrame;
+        if (settled > _read[profiles[i].name]!) _read[profiles[i].name] = settled;
       }
     } catch (e) {
       debugPrint('decode pass failed: $e');
@@ -222,11 +235,21 @@ class SoundLink {
     try {
       await _player.setAudioContext(AudioContext(android: const AudioContextAndroid(audioFocus: AndroidAudioFocus.none)));
       await _player.setVolume(1.0);
-      await _player.play(BytesSource(wav(pcm, profile.sampleRate), mimeType: 'audio/wav'));
+      await _player.play(await _source(wav(pcm, profile.sampleRate)));
       await Future<void>.delayed(Duration(milliseconds: 1000 * pcm.length ~/ profile.sampleRate + 250));
     } finally {
       await MediaVolume.restore(borrowed);
     }
+  }
+
+  /// The frame as something the player can play. A file on a phone, because
+  /// that is the path measured on real hardware (tool/sound_lab.dart); bytes
+  /// in a browser, which has no files.
+  Future<Source> _source(Uint8List bytes) async {
+    if (kIsWeb) return BytesSource(bytes, mimeType: 'audio/wav');
+    final f = File('${(await getTemporaryDirectory()).path}/connect_frame.wav');
+    await f.writeAsBytes(bytes, flush: true);
+    return DeviceFileSource(f.path, mimeType: 'audio/wav');
   }
 
   static Uint8List wav(Int16List pcm, int sampleRate) {
@@ -262,34 +285,5 @@ class SoundLink {
     await _levels.close();
     await _player.dispose();
     await _rec.dispose();
-  }
-}
-
-/// The phone's media volume, which decides how far a sent frame carries. A
-/// send borrows it at full and hands it back; with headphones or a speaker
-/// attached it is left alone. Only Android answers; elsewhere this does nothing.
-class MediaVolume {
-  static const _channel = MethodChannel('connect/audio');
-
-  /// Raises the media volume to [fraction] of full for a send; returns what
-  /// to pass to [restore], or null when nothing was changed.
-  static Future<int?> borrow([double fraction = 1.0]) async {
-    try {
-      return await _channel.invokeMethod<int>('borrowVolume', fraction);
-    } on MissingPluginException {
-      return null;
-    } catch (e) {
-      debugPrint('volume: $e');
-      return null;
-    }
-  }
-
-  static Future<void> restore(int? previous) async {
-    if (previous == null) return;
-    try {
-      await _channel.invokeMethod<void>('restoreVolume', previous);
-    } catch (e) {
-      debugPrint('volume: $e');
-    }
   }
 }

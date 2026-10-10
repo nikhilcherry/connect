@@ -14,6 +14,19 @@ QR tag → masked chat, plate-as-QR, on-device plate OCR, photo labelling (conse
 | 4 | **Duplicate-alert guard** for a retry after a lost reply | Hardens the offline send | 1–2 h | e2e |
 | 5 | **Stronger photo understanding** (only if a better on-device model fits) | The current labeller is deliberately conservative | open | measure on real photos first |
 
+## Where this stands (early on 10 Oct)
+| Planned | State |
+|---|---|
+| 1. Proof of plate ownership | An RC check runs when a car is added, but on demo data with a simulated comparison. Nothing is marked `verified` on the server and the plate lookup rule is unchanged |
+| 2. Account recovery | Not started. A build pointed at a new server address now keeps the account, which was the way phones were losing their cars during the event |
+| 3. Weekly "back by" schedule | Not started |
+| 4. Duplicate-alert guard | Done: `alerts.client_ref`, 9 e2e checks, and the scan page sends a reference with every alert |
+| 5. Stronger photo understanding | Not started |
+
+Built instead, because the venue showed what was missing (see `APP_FEATURES.md`): the app opening with no connection, *Say it with sound* (alerts carried between phones by ultrasound where there is no signal), *Witness mode*, and `scripts/demo-up.sh` to keep the laptop backend up.
+
+Still owed before the demo: publish the scan page (`scripts/demo-up.sh --publish`), try *Say it with sound* between two real phones, and try Witness mode with a real knock.
+
 ## Timeline
 - **Hour 0–2:** install the APK on the iQOO phone, run `docs/demo-runbook.md` end to end, write down what breaks. Fix those first.
 - **Hour 2–14:** features 1 and 2.

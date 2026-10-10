@@ -7,10 +7,13 @@
 //   adb push jobs.json some.wav /sdcard/Android/data/app.connectcar.connect.lab/files/
 //   adb shell am start -S -n app.connectcar.connect.lab/app.connectcar.connect.MainActivity
 //
-// Each job in jobs.json records the microphone while (optionally) playing a
-// WAV on the speaker, and saves the recording as rec_<id>.wav for
-// tool/modem_wav.dart to decode:
+// It first runs the app's own sound link against itself (send on each band,
+// listen for it), which checks the recorder, the player, the volume channel
+// and the decoder on this phone in one go. Then each job in jobs.json, if the
+// file is there, records the microphone while (optionally) playing a WAV on
+// the speaker, and saves the recording as rec_<id>.wav for tool/modem_wav.dart:
 //   [{"id": "u1", "play": "u1.wav", "seconds": 4, "rate": 48000, "source": "unprocessed"}]
+// Everything is logged with the tag LAB:  adb logcat -s flutter | grep LAB
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -18,6 +21,7 @@ import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:connect/services/sound_link.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
@@ -57,9 +61,11 @@ class _LabState extends State<_Lab> {
       _say('FAILED no microphone permission');
       return;
     }
+    await _selfTest();
     final jobsFile = File('${dir.path}/jobs.json');
     if (!jobsFile.existsSync()) {
-      _say('FAILED no jobs.json');
+      _say('no jobs.json');
+      _say('ALL DONE');
       return;
     }
     final jobs = (jsonDecode(await jobsFile.readAsString()) as List).cast<Map<String, dynamic>>();
@@ -102,6 +108,39 @@ class _LabState extends State<_Lab> {
     }
     await rec.dispose();
     _say('ALL DONE');
+  }
+
+  /// The app's sound link talking to itself, three times on each band.
+  Future<void> _selfTest() async {
+    const probe = [0x11, 0x21, 0xBE, 0xEF, 0x54, 0xB0, 0x42, 0x2C, 0xC0, 0x83, 0x10, 0x50]; // a real alert frame
+    final link = SoundLink(hearSelf: true);
+    var level = SoundLevel.silent;
+    final levels = link.levels.listen((l) {
+      if (l.ultrasonic > level.ultrasonic || l.audible > level.audible) {
+        level = SoundLevel(l.peak, l.ultrasonic > level.ultrasonic ? l.ultrasonic : level.ultrasonic, l.audible > level.audible ? l.audible : level.audible);
+      }
+    });
+    try {
+      await link.listen();
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+      for (final p in SoundLink.profiles) {
+        for (var i = 1; i <= 3; i++) {
+          level = SoundLevel.silent;
+          final sw = Stopwatch()..start();
+          final heard = link.frames.firstWhere((f) => f.profile == p && listEquals(f.payload, probe));
+          await link.send(probe, p);
+          final sent = sw.elapsedMilliseconds;
+          final ok = await heard.then((_) => true).timeout(const Duration(seconds: 4), onTimeout: () => false);
+          _say('selftest ${p.name} $i heard=$ok sent_ms=$sent total_ms=${sw.elapsedMilliseconds} '
+              'band_ultra=${level.ultrasonic.toStringAsFixed(2)} band_audible=${level.audible.toStringAsFixed(2)}');
+        }
+      }
+    } catch (e) {
+      _say('selftest FAILED $e');
+    } finally {
+      await levels.cancel();
+      await link.dispose();
+    }
   }
 
   @override

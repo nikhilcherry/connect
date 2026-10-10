@@ -18,6 +18,7 @@ import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/motion.dart';
 import 'medical_screen.dart';
+import 'witness_screen.dart';
 
 class SafetyTab extends StatelessWidget {
   const SafetyTab({super.key});
@@ -57,6 +58,13 @@ class SafetyTab extends StatelessWidget {
               Text(tr('Add an emergency contact below first.'), style: DLText.small),
             ],
           ]),
+        ),
+        const SizedBox(height: 12),
+        InfoRow(
+          icon: Icons.videocam_outlined,
+          title: tr('Witness mode'),
+          subtitle: tr('Parked? Leave a phone watching. It writes down the plates around a bump.'),
+          onTap: () => push(context, const WitnessScreen()),
         ),
         const SizedBox(height: 12),
 

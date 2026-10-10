@@ -24,7 +24,10 @@ enum _Phase { idle, reading, ready, searching, notFound }
 /// and if that car is on Connect open the same masked chat a sticker scan
 /// would. No sticker needed, and the answer is only "a Connect car exists".
 class PlateScanScreen extends StatefulWidget {
-  const PlateScanScreen({super.key});
+  const PlateScanScreen({super.key, this.plate});
+
+  /// A plate already read elsewhere (Witness mode): looked up straight away.
+  final String? plate;
 
   @override
   State<PlateScanScreen> createState() => _PlateScanScreenState();
@@ -39,6 +42,15 @@ class _PlateScanScreenState extends State<PlateScanScreen> {
   Situation? _situation;
   bool _analysing = false;
   bool _noSignal = false; // the lookup could not reach the server
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.plate != null) {
+      _plate.text = widget.plate!;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _find());
+    }
+  }
 
   @override
   void dispose() {

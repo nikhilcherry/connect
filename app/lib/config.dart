@@ -17,6 +17,10 @@ class Config {
     defaultValue: 'sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH',
   );
 
+  /// The name supabase_flutter files the signed-in session under: it is taken
+  /// from the server's address (see main.dart, carrySessionOver).
+  static String sessionKey(String url) => 'sb-${Uri.parse(url).host.split('.').first}-auth-token';
+
   /// Where the QR on a tag points. Printed stickers can't be changed, so this
   /// defaults to the production domain in every build; local testing overrides
   /// it with --dart-define=SCAN_BASE_URL=http://127.0.0.1:8093.

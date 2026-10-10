@@ -2,6 +2,7 @@ package app.connectcar.connect
 
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
+import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -19,7 +20,7 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         val audio = getSystemService(AudioManager::class.java)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "connect/audio").setMethodCallHandler { call, result ->
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "connect/device").setMethodCallHandler { call, result ->
             try {
                 when (call.method) {
                     // The sound link (lib/services/sound_link.dart) borrows the media volume for the
@@ -41,10 +42,16 @@ class MainActivity : FlutterActivity() {
                         (call.arguments as? Int)?.let { audio.setStreamVolume(AudioManager.STREAM_MUSIC, it, 0) }
                         result.success(null)
                     }
+                    // Witness mode watches through the camera, which stops when the screen sleeps.
+                    "keepAwake" -> {
+                        if (call.arguments == true) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                        else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             } catch (e: Exception) {
-                result.error("audio", e.message, null)
+                result.error("device", e.message, null)
             }
         }
     }

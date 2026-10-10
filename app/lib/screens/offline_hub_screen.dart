@@ -10,6 +10,7 @@ import 'garage_log_screen.dart';
 import 'parking_screen.dart';
 import 'wallet_screen.dart';
 import 'whisper_screen.dart';
+import 'witness_screen.dart';
 
 /// What still works with no connection: everything that runs on the phone.
 /// Opened from the Offline screen; "Try again" returns to the normal app.
@@ -37,6 +38,7 @@ class OfflineHubScreen extends StatelessWidget {
           ),
         ),
         row(Icons.graphic_eq, tr('Say it with sound'), tr('No signal in the basement? Pass the message on by sound, phone to phone'), const WhisperScreen()),
+        row(Icons.videocam_outlined, tr('Witness mode'), tr('Parked? Leave a phone watching. It writes down the plates around a bump.'), const WitnessScreen()),
         row(Icons.car_crash_outlined, tr('Check damage and cost'), tr('Photograph damage; the phone marks it and estimates a repair cost'), const DamageReportScreen()),
         row(Icons.local_gas_station_outlined, tr('Fuel and expenses'), tr('Mileage, monthly spend, tolls and parking'), const GarageLogScreen()),
         row(Icons.folder_copy_outlined, tr('Documents'), tr('Photos of RC, insurance, PUC and licence, on this phone only'), const WalletScreen()),

@@ -4,12 +4,11 @@ import 'package:flutter/services.dart';
 import '../data/car_catalog.dart';
 import '../data/models.dart';
 import '../main.dart';
-import '../services/notifications.dart';
 import '../l10n.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'car_photo_screen.dart';
 import 'family_screen.dart';
-import 'tag_screen.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -55,7 +54,7 @@ class WelcomeScreen extends StatelessWidget {
                   const Spacer(),
                   const SizedBox(height: 24),
                   FilledButton(
-                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VehicleFormScreen())),
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CarPhotoScreen())),
                     child: Text(tr('Add my car')),
                   ),
                   const SizedBox(height: 8),
@@ -118,13 +117,10 @@ class _Point extends StatelessWidget {
 // Stored in English (the scan page shows them); translated only for display.
 const _colours = [/*t*/'White', /*t*/'Silver', /*t*/'Grey', /*t*/'Black', /*t*/'Red', /*t*/'Blue', /*t*/'Brown', /*t*/'Green', /*t*/'Orange', /*t*/'Yellow'];
 
-/// Add (from onboarding) or edit (from Garage) the owner's vehicle.
+/// Edit (from Garage) the owner's vehicle. Adding a car starts at [CarPhotoScreen].
 class VehicleFormScreen extends StatefulWidget {
-  const VehicleFormScreen({super.key, this.existing, this.addAnother = false});
+  const VehicleFormScreen({super.key, required Vehicle this.existing});
   final Vehicle? existing;
-
-  /// Adds a further car to an account that already has one.
-  final bool addAnother;
 
   @override
   State<VehicleFormScreen> createState() => _VehicleFormScreenState();
@@ -154,6 +150,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
 
   Future<void> _save() async {
     if (!_form.currentState!.validate()) return;
+    if (!mounted) return;
     if (!_manual && _spec == null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('Pick your car model, or enter it manually.'))));
       return;
@@ -174,22 +171,9 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
         'width_mm': spec?.widthMm ?? widget.existing?.widthMm,
         'height_mm': spec?.heightMm ?? widget.existing?.heightMm,
       };
-      if (widget.addAnother) {
-        await s.addVehicle(fields);
-      } else {
-        await s.saveVehicle(fields);
-      }
+      await s.saveVehicle(fields);
       if (!mounted) return;
-      if (_editing || widget.addAnother) {
-        Navigator.of(context).pop();
-      } else {
-        await Notifications.requestPermission();
-        if (!mounted) return;
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const TagScreen(firstTime: true)),
-          (r) => false,
-        );
-      }
+      Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
         setState(() => _saving = false);
@@ -206,17 +190,11 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_editing ? tr('Edit car') : widget.addAnother ? tr('Add another car') : tr('Your car'))),
+      appBar: AppBar(title: Text(tr('Edit car'))),
       body: SafeArea(
         child: Form(
           key: _form,
           child: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 32), children: [
-            if (!_editing) ...[
-              Label(tr('Step 1 of 2')),
-              const SizedBox(height: 8),
-              Text(tr('Tell us about your car'), style: DLText.title),
-              const SizedBox(height: 24),
-            ],
             FieldLabel(tr('Number plate')),
             TextFormField(
               controller: _reg,
@@ -306,7 +284,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
               onPressed: _saving ? null : _save,
               child: _saving
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5, color: DL.muted))
-                  : Text(_editing ? tr('Save') : tr('Create my tag')),
+                  : Text(tr('Save')),
             ),
           ]),
         ),

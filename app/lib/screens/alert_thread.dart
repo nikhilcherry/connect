@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../data/app_state.dart';
 import '../data/models.dart';
 import '../l10n.dart';
 import '../main.dart';
@@ -41,26 +42,31 @@ class _AlertThreadScreenState extends State<AlertThreadScreen> {
   final _dictation = Dictation();
   bool _listening = false;
 
+  // Held from the start: looking it up while being torn down (the whole app
+  // closing with a thread open) throws, and so does a late realtime callback.
+  late final AppState _state;
+
   @override
   void initState() {
     super.initState();
-    final s = AppScope.read(context);
+    _state = AppScope.read(context);
     _load();
-    _channel = s.watchMessages(widget.alertId, _load);
-    s.markSeen(widget.alertId);
+    _channel = _state.watchMessages(widget.alertId, _load);
+    _state.markSeen(widget.alertId);
   }
 
   @override
   void dispose() {
-    if (_channel != null) AppScope.read(context).unwatch(_channel!);
+    if (_channel != null) _state.unwatch(_channel!);
     _input.dispose();
     _scroll.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     try {
-      final m = await AppScope.read(context).messages(widget.alertId);
+      final m = await _state.messages(widget.alertId);
       if (!mounted) return;
       final first = _seenUpTo == null;
       setState(() {

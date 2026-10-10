@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../l10n.dart';
 import '../services/notifications.dart';
+import '../services/rc_mock.dart';
 import '../services/whisper.dart';
 import 'models.dart';
 
@@ -78,15 +79,22 @@ class AppState extends ChangeNotifier {
     loading = true;
     loadError = null;
     notifyListeners();
+    // A phone that has loaded its car before opens on the copy it kept, at
+    // once: the tag, the garage and every on-device tool need no server, and
+    // starting must not wait on the network. The server's answer replaces
+    // the copy when it comes.
+    final fromCopy = vehicle == null && _db.auth.currentSession != null && await _restoreCache();
+    if (fromCopy) {
+      loading = false;
+      notifyListeners();
+    }
     try {
       // Without a limit, a connection that accepts and then stalls (a captive
       // portal, a dead tunnel) leaves the loading screen up for a minute.
       await _signInAndLoad().timeout(_patience);
     } catch (e) {
       debugPrint('bootstrap failed: $e');
-      // A car that loaded before can be shown from the copy on this phone: the
-      // tag, the garage and every on-device tool need no server.
-      if (await _restoreCache()) {
+      if (fromCopy || await _restoreCache()) {
         _wentOffline();
       } else {
         loadErrorIsNetwork = isNetworkError(e);
@@ -553,6 +561,40 @@ class AppState extends ChangeNotifier {
       if (e.status == 404) return null;
       rethrow;
     }
+  }
+
+  /// RC details for a plate from the server's licensed provider. Without a
+  /// provider token, or with no signal, falls back to demo data so the flow
+  /// still runs. Never includes the owner's name from the server.
+  /// Has the local vision model (on the laptop, through the `vehicle-vision`
+  /// function) read a car or RC photo. Null when it can't be reached or
+  /// answers nothing usable; callers fall back to on-device reading.
+  Future<Map<String, String?>?> visionRead(String kind, List<int> jpeg) async {
+    try {
+      final res = await _db.functions
+          .invoke('vehicle-vision', body: {'kind': kind, 'image': base64Encode(jpeg)})
+          .timeout(const Duration(seconds: 100));
+      final d = res.data;
+      if (d is Map && d['fields'] is Map) {
+        return {for (final e in (d['fields'] as Map).entries) '${e.key}': e.value as String?};
+      }
+    } catch (e) {
+      debugPrint('vision read failed: $e');
+    }
+    return null;
+  }
+
+  Future<RcRecord> lookupRc(String plate) async {
+    try {
+      final res = await _db.functions.invoke('rc-lookup', body: {'plate': plate});
+      final data = res.data;
+      if (data is Map && data['vehicle'] is Map) {
+        return RcRecord.fromServer(plate, {...Map<String, dynamic>.from(data['vehicle'] as Map), 'mock': data['mock']});
+      }
+    } on FunctionException catch (e) {
+      if (e.status == 429) rethrow;
+    } catch (_) {}
+    return RcRecord.demo(plate);
   }
 
   /// Hands a message that reached this phone by sound to the server, as any

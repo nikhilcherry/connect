@@ -11,7 +11,7 @@ import '../main.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/motion.dart';
-import 'home_shell.dart';
+import 'onboarding_complete.dart';
 
 /// The owner's tag: the QR to print or stick on the windshield.
 class TagScreen extends StatefulWidget {
@@ -68,7 +68,7 @@ class _TagScreenState extends State<TagScreen> {
           children: revealAll([
             if (firstTime) ...[
               const SizedBox(height: 20),
-              Label(tr('Step 2 of 2')),
+              Label(tr('Step 3 of 3')),
               const SizedBox(height: 8),
               Text(tr('Your tag is ready'), style: DLText.display),
               const SizedBox(height: 10),
@@ -187,7 +187,7 @@ class _TagScreenState extends State<TagScreen> {
             if (firstTime) ...[
               const SizedBox(height: 32),
               FilledButton(
-                onPressed: () => Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const HomeShell()), (r) => false),
+                onPressed: () => Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const OnboardingCompleteScreen()), (r) => false),
                 child: Text(tr('Done')),
               ),
             ] else if (!s.isOwner) ...[

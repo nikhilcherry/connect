@@ -19,7 +19,7 @@ import '../widgets/common.dart';
 import '../widgets/motion.dart';
 import 'sound_check_screen.dart';
 
-enum _Sent { nothing, sending, owner, carried, nobody }
+enum _Sent { nothing, sending, owner, carried, delivered, unknownCar, nobody }
 
 /// Reaching a car's owner where there is no signal. The phone says which car
 /// and what is wrong as two seconds of sound; any Connect phone in earshot
@@ -121,7 +121,11 @@ class _WhisperScreenState extends State<WhisperScreen> {
     final car = s.vehicles.where((v) => v.regNumber == w.plate).firstOrNull;
     if (await WhisperStore.add(w, mine: car != null)) {
       HapticFeedback.heavyImpact();
-      if (car != null) Notifications.showWhisper(w.kind, car, w.nonce);
+      // With a signal on both phones the same alert may already have arrived through the
+      // server, with its own notification; one buzz for one message.
+      final already = car != null &&
+          s.alerts.any((a) => a.vehicleId == car.id && a.kind == w.kind && DateTime.now().difference(a.createdAt).inMinutes < 2);
+      if (car != null && !already) Notifications.showWhisper(w.kind, car, w.nonce);
       unawaited(WhisperStore.flush(s.deliverWhisper));
     }
     // Answer every time, even a repeat: the sender repeats because it missed
@@ -187,7 +191,17 @@ class _WhisperScreenState extends State<WhisperScreen> {
     }
     _answerFor = null;
     if (!mounted) return;
-    setState(() => _sent = ack == null ? _Sent.nobody : (ack.owner ? _Sent.owner : _Sent.carried));
+    // With no answer by sound, what this phone itself managed over the internet is the news.
+    final mine = WhisperStore.heard.value.where((h) => h.whisper == w).firstOrNull?.state;
+    setState(() {
+      _sent = ack != null
+          ? (ack.owner ? _Sent.owner : _Sent.carried)
+          : switch (mine) {
+              WhisperState.delivered => _Sent.delivered,
+              WhisperState.unknownCar => _Sent.unknownCar,
+              _ => _Sent.nobody,
+            };
+    });
     if (ack != null) HapticFeedback.mediumImpact();
   }
 
@@ -258,6 +272,10 @@ class _WhisperScreenState extends State<WhisperScreen> {
                 child: switch (_sent) {
                   _Sent.owner => _Outcome(Icons.check_circle_outline, Tone.success, tr('The owner\'s phone heard it.'), key: const ValueKey('owner')),
                   _Sent.carried => _Outcome(Icons.directions_walk, Tone.success, tr('A phone nearby heard it and will deliver it.'), key: const ValueKey('carried')),
+                  _Sent.delivered => _Outcome(Icons.cloud_done_outlined, Tone.success,
+                      tr('Nobody nearby answered by sound, but this phone has a signal and has delivered it.'), key: const ValueKey('delivered')),
+                  _Sent.unknownCar => _Outcome(Icons.info_outline, Tone.neutral,
+                      tr('That car isn\'t on Connect yet. Nothing was sent and nobody was told.'), key: const ValueKey('unknown')),
                   _Sent.nobody => _Outcome(Icons.schedule, Tone.warning,
                       tr('Nobody nearby answered. This phone will deliver it as soon as it has a signal.'), key: const ValueKey('nobody')),
                   _ => const SizedBox(key: ValueKey('none'), width: double.infinity),

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'config.dart';
@@ -18,6 +19,7 @@ import 'services/push.dart';
 import 'services/trip_share.dart';
 import 'services/wallet.dart';
 import 'services/whisper.dart';
+import 'services/witness.dart';
 import 'screens/offline_hub_screen.dart';
 import 'theme.dart';
 import 'widgets/common.dart';
@@ -25,10 +27,31 @@ import 'widgets/motion.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
+/// A build pointed at a new address for the same backend (a custom domain, a
+/// tunnel in place of a cable) must not start out as a stranger: the account
+/// lives only on this phone, so that would lose the car, and adding the car
+/// again would leave its plate claimed twice. The session is filed under a
+/// name taken from the address. When there is none under the new name and
+/// exactly one under an old one, it is carried over. A session that belongs
+/// to a different backend is refused by the server and replaced, as before.
+Future<void> carrySessionOver(SharedPreferences prefs, String url) async {
+  final key = Config.sessionKey(url);
+  if (prefs.containsKey(key)) return;
+  final old = prefs.getKeys().where((k) => k.startsWith('sb-') && k.endsWith('-auth-token')).toList();
+  if (old.length != 1) return;
+  final session = prefs.getString(old.single);
+  if (session != null) await prefs.setString(key, session);
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await carrySessionOver(await SharedPreferences.getInstance(), Config.supabaseUrl);
+  } catch (e) {
+    debugPrint('session not carried over: $e');
+  }
   await Supabase.initialize(url: Config.supabaseUrl, publishableKey: Config.supabaseAnonKey);
-  await Future.wait([L10n.load(), Notifications.init(), ParkingStore.load(), GarageLog.load(), Wallet.load(), WhisperStore.load()]);
+  await Future.wait([L10n.load(), Notifications.init(), ParkingStore.load(), GarageLog.load(), Wallet.load(), WhisperStore.load(), WitnessLog.load()]);
   final state = AppState(Supabase.instance.client)..bootstrap();
   unawaited(Push.init(state));
   unawaited(TripShare.resume(state));

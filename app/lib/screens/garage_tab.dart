@@ -12,6 +12,7 @@ import '../widgets/motion.dart';
 import 'family_screen.dart';
 import 'fit_check.dart';
 import 'garage_log_screen.dart';
+import 'car_photo_screen.dart';
 import 'onboarding.dart';
 import 'parking_screen.dart';
 import 'damage_report_screen.dart';
@@ -79,7 +80,7 @@ class GarageTab extends StatelessWidget {
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
-              onPressed: () => push(context, const VehicleFormScreen(addAnother: true)),
+              onPressed: () => push(context, const CarPhotoScreen(addAnother: true)),
               icon: const Icon(Icons.add),
               label: Text(tr('Add another car')),
             ),
