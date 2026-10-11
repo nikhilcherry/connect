@@ -21,3 +21,6 @@ __pycache__/
 app/build/
 app/.dart_tool/
 .gradle/
+
+# local Docker demo settings (keys)
+.env

@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# One command for the whole Connect demo backend, in Docker.
+#
+#   ./connect up        build + start everything (first run pulls images: ~5-10 min)
+#   ./connect up --tunnel   also start the Cloudflare tunnel (needs TUNNEL_TOKEN in .env)
+#   ./connect status    what is up, with the URLs
+#   ./connect logs [backend|scanpage|n8n]
+#   ./connect down      stop everything (data is kept)
+#   ./connect reset     stop and DELETE the demo database and n8n data
+#
+# Needs only Docker (with the compose plugin). Run it from anywhere.
+set -uo pipefail
+cd "$(dirname "$(readlink -f "$0")")"
+export PROJECT_DIR="$PWD"
+export DOCKER_HOST="${DOCKER_HOST:-unix:///var/run/docker.sock}"
+[ -f .env ] || { cp .env.example .env; echo "created .env (add JEV_API_KEY / OPENROUTER_API_KEY there for the n8n demo)"; }
+set -a; . ./.env; set +a
+command -v docker >/dev/null || { echo "Docker is not installed"; exit 1; }
+docker compose version >/dev/null 2>&1 || { echo "needs the Docker compose plugin"; exit 1; }
+
+SCAN_PORT="${SCAN_PORT:-8093}"; N8N_PORT="${N8N_PORT:-5678}"
+API="http://127.0.0.1:54321"
+LABEL="com.supabase.cli.project=$(sed -n 's/^project_id *= *"\(.*\)"/\1/p' supabase/config.toml)"
+code() { curl -s -m 5 -o /dev/null -w '%{http_code}' "${@:2}" "$1" 2>/dev/null || true; }
+scan_code() { code "$API/functions/v1/scan" -X POST -H 'content-type: application/json' -d '{"action":"lookup","code":"ZZZZZZZZ"}'; }
+row() { printf '  %-10s %-6s %s\n' "$1" "$2" "$3"; }
+ok() { [ "$1" = "$2" ] && echo ok || echo "wait ($1)"; }
+
+status() {
+  echo "Connect demo:"
+  row backend "$(ok "$(code $API/rest/v1/)" 200)" "API $API   Studio http://127.0.0.1:54323"
+  row functions "$(ok "$(scan_code)" 404)" "scan, notify, rc-lookup, vehicle-vision (404 for an unknown tag is right)"
+  row scanpage "$(ok "$(code http://127.0.0.1:$SCAN_PORT/)" 200)" "http://127.0.0.1:$SCAN_PORT/t/<TAG>"
+  row n8n "$(ok "$(code http://127.0.0.1:$N8N_PORT/healthz)" 200)" "http://127.0.0.1:$N8N_PORT  (webhooks: /webhook/connect-alert, /webhook/connect-whisper)"
+  [ -z "${JEV_API_KEY:-}" ] && echo "  note: JEV_API_KEY / OPENROUTER_API_KEY not set in .env, the n8n demo will answer with errors"
+}
+
+case "${1:-up}" in
+  up)
+    profiles=(); [[ " $* " == *" --tunnel "* ]] && profiles=(--profile tunnel)
+    docker compose "${profiles[@]}" up -d --build || exit 1
+    echo "waiting for the backend (first start downloads the Supabase images)..."
+    for _ in $(seq 1 300); do [ "$(scan_code)" = 404 ] && break; sleep 2; done
+    status ;;
+  down)   docker compose --profile tunnel down; docker ps -q --filter "label=$LABEL" | xargs -r docker stop ;;
+  status) status ;;
+  logs)   shift; docker compose logs -f --tail=80 "$@" ;;
+  reset)  read -rp "Delete the demo database and n8n data? [y/N] " a; [ "$a" = y ] || exit 0
+          docker compose --profile tunnel down -v; docker ps -aq --filter "label=$LABEL" | xargs -r docker rm -f
+          docker volume ls -q --filter "label=$LABEL" | xargs -r docker volume rm ;;
+  *) sed -n 2,12p "$0"; exit 1 ;;
+esac

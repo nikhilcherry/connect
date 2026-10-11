@@ -61,4 +61,4 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
 
 
-http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+http.server.ThreadingHTTPServer((os.environ.get("BIND", "127.0.0.1"), PORT), Handler).serve_forever()

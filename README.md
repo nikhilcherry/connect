@@ -129,6 +129,25 @@ scripts/      demo-up.sh: the stack, the functions, the scan page and the tunnel
 docs/         Feature inventory, demo runbook, roadmap notes
 ```
 
+## Run it in Docker (for friends, or when the laptop breaks)
+
+Needs only Docker with the compose plugin (Linux or WSL2). One command starts the whole backend:
+
+```bash
+git clone https://github.com/nikhilcherry/connect && cd connect
+./connect up        # first run pulls ~2 GB of images; later runs take seconds
+./connect status    # what is up, with the URLs
+./connect down      # stop everything (data kept);  ./connect reset  wipes the demo data
+```
+
+| Service | URL | What it is |
+|---|---|---|
+| backend | `http://localhost:54321` (Studio `:54323`) | Supabase (db, auth, storage, realtime) with this repo's migrations, plus the edge functions `scan`, `notify`, `rc-lookup`, `vehicle-vision` |
+| scanpage | `http://localhost:8093/t/<TAG>` | the page a stranger opens from a car's QR code |
+| n8n | `http://localhost:5678` | the two "how it works" workflows, already imported and published: `POST /webhook/connect-alert` (Jev + a cheap model triage a stranger's note) and `POST /webhook/connect-whisper` (the Bluetooth store-carry-forward relay) |
+
+`./connect up` creates `.env` from `.env.example`. For the n8n demo add `JEV_API_KEY` (TypeSafe) and `OPENROUTER_API_KEY`; without them the backend and scan page still work. Build the app against your machine with `--dart-define=SUPABASE_URL=http://<your-LAN-IP>:54321 --dart-define=SCAN_BASE_URL=http://<your-LAN-IP>:8093`, and set `CONNECT_API_URL` in `.env` to the same API address so the scan page talks to it. `./connect up --tunnel` also starts a Cloudflare tunnel when `TUNNEL_TOKEN` is set. If a default port is taken, change `SCAN_PORT` / `N8N_PORT` in `.env`; the Supabase ports come from `supabase/config.toml`.
+
 ## Run locally
 
 Needs Docker, the Supabase CLI, Node 20+ and Flutter 3.44; JDK 17 for Android builds.

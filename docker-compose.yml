@@ -1,0 +1,67 @@
+# Everything the Connect demo needs on one machine:  ./connect up
+#
+#   backend   Supabase (db, auth, storage, realtime) + the edge functions, started
+#             through the host's Docker. Ports 54321 (API), 54323 (Studio).
+#   scanpage  the web page a stranger opens from a car's QR code. :8093
+#   n8n       the two "how it works" workflows (alert flow, Bluetooth whisper
+#             relay) already imported and published. :5678
+#   tunnel    optional public address (profile "tunnel", needs TUNNEL_TOKEN).
+#
+# Phones' builds talk to CONNECT_API_URL; see README, "Run it in Docker".
+name: connect-demo
+
+services:
+  backend:
+    build: ./docker/launcher
+    # host network: the Supabase CLI health-checks the stack on 127.0.0.1
+    network_mode: host
+    environment:
+      PROJECT_DIR: ${PROJECT_DIR:-${PWD}}
+    working_dir: ${PROJECT_DIR:-${PWD}}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${PROJECT_DIR:-${PWD}}:${PROJECT_DIR:-${PWD}}
+    restart: unless-stopped
+
+  scanpage:
+    image: python:3.12-slim
+    working_dir: /app
+    command: ["python3", "serve.py", "8093"]
+    environment:
+      CONNECT_API_URL: ${CONNECT_API_URL:-http://localhost:54321}
+      BIND: 0.0.0.0
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./web:/app:ro
+    ports:
+      - "${SCAN_PORT:-8093}:8093"
+    restart: unless-stopped
+
+  n8n:
+    image: n8nio/n8n:2.22.6
+    entrypoint: ["/bin/sh", "/start.sh"]
+    environment:
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-connect-demo-not-a-secret}
+      N8N_SECURE_COOKIE: "false"
+      N8N_HOST: localhost
+      WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://localhost:5678/}
+      JEV_API_KEY: ${JEV_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+    volumes:
+      - ./docker/n8n/start.sh:/start.sh:ro
+      - ./docker/n8n/alert-flow.json:/seed/alert-flow.json:ro
+      - ./docker/n8n/whisper-relay.json:/seed/whisper-relay.json:ro
+      - n8n_data:/home/node/.n8n
+    ports:
+      - "${N8N_PORT:-5678}:5678"
+    restart: unless-stopped
+
+  tunnel:
+    profiles: ["tunnel"]
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN:-}
+    network_mode: host
+    restart: unless-stopped
+
+volumes:
+  n8n_data:
