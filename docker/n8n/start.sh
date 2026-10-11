@@ -14,7 +14,9 @@ cat > /tmp/seed/creds.json <<JSON
 JSON
 n8n import:credentials --input=/tmp/seed/creds.json
 n8n import:workflow --input=/seed/alert-flow.json
-n8n import:workflow --input=/seed/whisper-relay.json
+# The whisper relay can deliver to the live backend; point it at this stack (default: the host's).
+sed "s|CONNECT_API_PLACEHOLDER|${N8N_CONNECT_API:-http://host.docker.internal:54321}|g" /seed/whisper-relay.json > /tmp/seed/whisper-relay.json
+n8n import:workflow --input=/tmp/seed/whisper-relay.json
 # The violation dispatcher emails a demo inbox (DEMO_INBOX); real stations are set in its routing table.
 sed "s/DEMO_INBOX_PLACEHOLDER@example.com/${DEMO_INBOX:-you@example.com}/g" /seed/violation-dispatcher.json > /tmp/seed/violation-dispatcher.json
 n8n import:workflow --input=/tmp/seed/violation-dispatcher.json

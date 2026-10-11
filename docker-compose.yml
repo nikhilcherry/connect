@@ -40,6 +40,8 @@ services:
   n8n:
     image: n8nio/n8n:2.22.6
     entrypoint: ["/bin/sh", "/start.sh"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-connect-demo-not-a-secret}
       N8N_SECURE_COOKIE: "false"
@@ -48,6 +50,7 @@ services:
       JEV_API_KEY: ${JEV_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       DEMO_INBOX: ${DEMO_INBOX:-}
+      N8N_CONNECT_API: ${N8N_CONNECT_API:-}
     volumes:
       - ./docker/n8n/start.sh:/start.sh:ro
       - ./docker/n8n/alert-flow.json:/seed/alert-flow.json:ro
