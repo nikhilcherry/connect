@@ -42,6 +42,10 @@ class SoundLink {
   /// Report this phone's own frames too. Only the self-test wants that.
   final bool hearSelf;
 
+  /// False means silent only: the audible tones are neither heard nor answered. The silent band
+  /// still works, so a phone set this way is never noisy and ignores anyone's beeps.
+  bool audible = true;
+
   static const profiles = [ModemProfile.ultrasonic, ModemProfile.audible];
   static const sampleRate = 48000;
 
@@ -184,6 +188,7 @@ class SoundLink {
       for (var i = 0; i < profiles.length; i++) {
         for (final f in found[i]) {
           _read[profiles[i].name] = origin + f.end;
+          if (profiles[i] == ModemProfile.audible && !audible) continue;
           if ((hearSelf || !_isEcho(f.payload)) && !_frames.isClosed) _frames.add(HeardFrame(f.payload, profiles[i]));
         }
         // A frame that began more than one frame-length before the end of this

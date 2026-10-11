@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/models.dart';
 import '../l10n.dart';
@@ -52,7 +53,8 @@ class _WhisperScreenState extends State<WhisperScreen> {
   bool _bleWanted = true; // the Bluetooth switch
   bool _bleFailed = false;
   bool _micDenied = false;
-  bool _audibleToo = true;
+  bool _audibleToo = true; // audible beeps allowed (both ways); off = silent only
+  static const _audiblePref = 'whisper_audible_beeps';
   bool _reading = false;
   String? _plateError;
   SoundLevel _level = SoundLevel.silent;
@@ -71,6 +73,7 @@ class _WhisperScreenState extends State<WhisperScreen> {
   @override
   void initState() {
     super.initState();
+    _loadAudible();
     _frames = _link.frames.listen(_onFrame);
     _levels = _link.levels.listen(_onLevel);
     // Android silences the microphone of an app that is not on screen.
@@ -78,6 +81,26 @@ class _WhisperScreenState extends State<WhisperScreen> {
     // Android shows one permission dialog at a time and drops a second request
     // made meanwhile, so Bluetooth asks only once the microphone has answered.
     _listenIfWanted().whenComplete(_bleIfWanted);
+  }
+
+  Future<void> _loadAudible() async {
+    try {
+      final on = (await SharedPreferences.getInstance()).getBool(_audiblePref) ?? true;
+      _link.audible = on;
+      if (mounted) setState(() => _audibleToo = on);
+    } catch (e) {
+      debugPrint('audible setting not read: $e');
+    }
+  }
+
+  Future<void> _setAudible(bool on) async {
+    setState(() => _audibleToo = on);
+    _link.audible = on;
+    try {
+      await (await SharedPreferences.getInstance()).setBool(_audiblePref, on);
+    } catch (e) {
+      debugPrint('audible setting not saved: $e');
+    }
   }
 
   @override
@@ -329,8 +352,8 @@ class _WhisperScreenState extends State<WhisperScreen> {
               ],
               const SizedBox(height: 4),
               Row(children: [
-                Expanded(child: Text(tr('Fall back to audible tones when silence gets no answer'), style: DLText.small)),
-                Switch(value: _audibleToo, onChanged: sending ? null : (on) => setState(() => _audibleToo = on)),
+                Expanded(child: Text(tr('Allow audible beeps (off: silent only, nothing you can hear)'), style: DLText.small)),
+                Switch(value: _audibleToo, onChanged: sending ? null : _setAudible),
               ]),
             ]),
           ),
