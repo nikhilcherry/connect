@@ -17,6 +17,7 @@ services:
     network_mode: host
     environment:
       PROJECT_DIR: ${PROJECT_DIR:-${PWD}}
+      N8N_ALERT_WEBHOOK: ${N8N_ALERT_WEBHOOK-http://host.docker.internal:${N8N_PORT:-5678}/webhook/connect-alert}
     working_dir: ${PROJECT_DIR:-${PWD}}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

@@ -148,6 +148,8 @@ git clone https://github.com/nikhilcherry/connect && cd connect
 
 `./connect up` creates `.env` from `.env.example`. For the n8n demo add `JEV_API_KEY` (TypeSafe) and `OPENROUTER_API_KEY`; without them the backend and scan page still work. Build the app against your machine with `--dart-define=SUPABASE_URL=http://<your-LAN-IP>:54321 --dart-define=SUPABASE_ANON_KEY=sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH --dart-define=SCAN_BASE_URL=http://<your-LAN-IP>:8093` (leave out the anon key and the app uses the hosted project's key: the data calls still work but the live alert socket is rejected, so alerts only show after a restart), and set `CONNECT_API_URL` in `.env` to the same API address so the scan page talks to it. `./connect up --tunnel` also starts a Cloudflare tunnel when `TUNNEL_TOKEN` is set. If a default port is taken, change `SCAN_PORT` / `N8N_PORT` in `.env`; the Supabase ports come from `supabase/config.toml`.
 
+**The app and n8n.** With the Docker setup, every alert a stranger sends is also posted (plate last 4, reason, note, language) to the n8n alert flow, so you can watch it triage the alert live: set `N8N_ALERT_WEBHOOK=` empty in `.env` to switch that off. On a laptop run, add `N8N_ALERT_WEBHOOK="https://<your-n8n>/webhook/connect-alert"` to `supabase/functions/.env.local` and restart the functions (remove the `supabase_edge_runtime_connect` container first, or the old settings stay). Drive Mode violation reports go to n8n when the app is built with `--dart-define=VIOLATION_WEBHOOK_URL=https://<your-n8n>/webhook/traffic-violation`.
+
 ## Run locally
 
 Needs Docker, the Supabase CLI, Node 20+ and Flutter 3.44; JDK 17 for Android builds.

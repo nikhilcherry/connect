@@ -303,6 +303,30 @@ Deno.serve(async (req) => {
       }
 
       background((async () => {
+        // Optional: let an n8n workflow see each alert (triage, translation, a live view of the
+        // pipeline). Off unless N8N_ALERT_WEBHOOK is set. Only the plate's last four characters,
+        // the kind, the note and the language leave this server, and a failure never matters here.
+        const hook = Deno.env.get("N8N_ALERT_WEBHOOK");
+        if (hook) {
+          try {
+            await fetch(hook, {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                plate: "******" + tag.vehicle.reg_number.slice(-4),
+                kind: body.kind,
+                text: note ?? KIND_LABEL[body.kind as string],
+                lang: typeof body.lang === "string" && LANGS.has(body.lang) ? body.lang : "en",
+                ownerLang: "en",
+                via: body.via === "sound" ? "sound" : "tag",
+                alert_id: alert.id,
+              }),
+              signal: AbortSignal.timeout(5000),
+            });
+          } catch (e) {
+            console.error("n8n alert hook failed", (e as Error).message);
+          }
+        }
         await pushToUsers(db, await vehicleAudience(db, tag.vehicle.id, tag.owner), {
           title: `${KIND_LABEL[body.kind as string]}: ${[tag.vehicle.make, tag.vehicle.model].join(" ")}`,
           body: note ?? "Someone near your car needs you. Tap to reply.",
