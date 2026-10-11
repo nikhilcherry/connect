@@ -88,126 +88,112 @@ class GarageTab extends StatelessWidget {
         const SizedBox(height: 16),
         Label(tr('Running the car')),
         const SizedBox(height: 12),
-        Card(
-          clipBehavior: Clip.antiAlias,
-          child: Column(children: [
-            _Row(
+        GridView.count(
+          crossAxisCount: 3,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          childAspectRatio: 0.95,
+          children: [
+            _GridTile(
               icon: Icons.local_gas_station_outlined,
               title: tr('Fuel and expenses'),
-              subtitle: tr('Mileage, monthly spend, tolls and parking'),
               onTap: () => push(context, const GarageLogScreen()),
             ),
-            const Divider(),
-            _Row(
+            _GridTile(
               icon: Icons.build_outlined,
               title: tr('Service history'),
-              subtitle: tr('Every visit in one place, shareable as a PDF when you sell'),
               onTap: () => push(context, const GarageLogScreen(filter: LogFilter.service)),
             ),
-            const Divider(),
-            _Row(
+            _GridTile(
               icon: Icons.folder_copy_outlined,
               title: tr('Documents'),
-              subtitle: tr('Photos of RC, insurance, PUC and licence, on this phone only'),
               onTap: () => push(context, const WalletScreen()),
             ),
-            const Divider(),
-            _Row(
+            _GridTile(
               icon: Icons.event_note_outlined,
               title: tr('Renewals and reminders'),
-              subtitle: tr('PUC, insurance and service dates'),
               onTap: () => push(context, const RenewalsScreen()),
             ),
-            const Divider(),
-            _Row(
+            _GridTile(
               icon: Icons.document_scanner_outlined,
-              title: tr('Reach a car by its plate'),
-              subtitle: tr('Point the camera at any number plate; the reading happens on this phone'),
+              title: tr('Plate scan'),
               onTap: () => push(context, const PlateScanScreen()),
             ),
-            const Divider(),
-            _Row(
+            _GridTile(
               icon: Icons.graphic_eq,
-              title: tr('Say it with sound'),
-              subtitle: tr('No signal in the basement? Pass the message on by sound, phone to phone'),
+              title: tr('Sound alert'),
               onTap: () => push(context, const WhisperScreen()),
             ),
-            const Divider(),
-            _Row(
+            _GridTile(
               icon: Icons.car_crash_outlined,
               title: tr('Check damage and cost'),
-              subtitle: tr('Photograph damage; the phone marks it and estimates a repair cost'),
               onTap: () => push(context, const DamageReportScreen()),
             ),
-            const Divider(),
-            _Row(
+            _GridTile(
               icon: Icons.receipt_long_outlined,
               title: tr('Check challans'),
-              subtitle: tr('Opens the official Parivahan e-challan site'),
-              trailing: const Icon(Icons.open_in_new, size: 20, color: DL.muted),
+              trailing: const Icon(Icons.open_in_new, size: 14, color: DL.muted),
               onTap: () => _openChallan(context, v.regNumber),
             ),
-          ]),
+          ],
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 28),
         Label(tr('People and places')),
         const SizedBox(height: 12),
-        Card(
-          clipBehavior: Clip.antiAlias,
-          child: Column(children: [
-            _Row(
+        GridView.count(
+          crossAxisCount: 3,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          childAspectRatio: 0.95,
+          children: [
+            _GridTile(
               icon: Icons.group_outlined,
               title: tr('Family'),
-              subtitle: s.isOwner
-                  ? (s.family.isEmpty ? tr('Share alerts with people who also drive this car') : tr('Shared with {n}', {'n': s.family.length}))
-                  : tr('Shared with you · see who else gets alerts'),
               onTap: () => push(context, const FamilyScreen()),
             ),
-            const Divider(),
-            _Row(
+            _GridTile(
               icon: Icons.apartment_outlined,
               title: tr('Society'),
-              subtitle: s.societies.isEmpty
-                  ? tr('Get parking notices from your apartment or office')
-                  : s.societies.map((x) => x.name).join(', '),
               onTap: () => push(context, const SocietiesScreen()),
             ),
-            const Divider(),
-            _Row(
+            _GridTile(
               icon: Icons.local_parking_outlined,
               title: tr('Where did I park'),
-              subtitle: tr('Save your spot, walk back, get a reminder before parking runs out'),
               onTap: () => push(context, const ParkingScreen()),
             ),
-            const Divider(),
-            _Row(
+            _GridTile(
               icon: Icons.straighten_outlined,
               title: tr('Fit Check'),
-              subtitle: tr('Will a car fit your parking spot or garage?'),
               onTap: () => push(context, const FitCheckScreen()),
             ),
-          ]),
+          ],
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 28),
         Label(tr('Tag and app')),
         const SizedBox(height: 12),
-        Card(
-          clipBehavior: Clip.antiAlias,
-          child: Column(children: [
-            _Row(
+        GridView.count(
+          crossAxisCount: 3,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          childAspectRatio: 0.95,
+          children: [
+            _GridTile(
               icon: Icons.qr_code_2_outlined,
               title: tr('Tag settings'),
-              subtitle: s.isOwner ? tr('Pause, replace or share your tag') : tr('Show or share the tag'),
               onTap: () => push(context, const TagScreen()),
             ),
-            const Divider(),
-            _Row(
+            _GridTile(
               icon: Icons.translate_outlined,
               title: tr('Language'),
-              subtitle: L10n.lang.value.native,
               onTap: () => showLanguageSheet(context),
             ),
-          ]),
+          ],
         ),
         const SizedBox(height: 32),
         Label(tr('Your privacy')),
@@ -312,32 +298,79 @@ class _Dim extends StatelessWidget {
   }
 }
 
-class _Row extends StatelessWidget {
-  const _Row({required this.icon, required this.title, required this.subtitle, required this.onTap, this.trailing});
+class _GridTile extends StatelessWidget {
+  const _GridTile({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+    this.trailing,
+  });
+
   final IconData icon;
   final String title;
-  final String subtitle;
   final VoidCallback onTap;
   final Widget? trailing;
 
+  /// Toggle between white card boxes (true) and borderless icons (false).
+  static const bool showBox = true;
+
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        child: Row(children: [
-          IconBadge(icon, size: 40),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(title, style: DLText.strong),
-              const SizedBox(height: 2),
-              Text(subtitle, style: DLText.small),
-            ]),
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Stack(
+            alignment: Alignment.topRight,
+            clipBehavior: Clip.none,
+            children: [
+              Icon(icon, size: 26, color: DL.ink),
+              if (trailing != null)
+                Positioned(
+                  right: -8,
+                  top: -4,
+                  child: trailing!,
+                ),
+            ],
           ),
-          trailing ?? const Icon(Icons.chevron_right, color: DL.muted),
-        ]),
+          const SizedBox(height: 6),
+          Flexible(
+            child: Text(
+              title,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: DLText.small.copyWith(
+                fontWeight: FontWeight.w600,
+                color: DL.ink,
+                fontSize: 11.5,
+                height: 1.2,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (showBox) {
+      return Pressable(
+        child: Card(
+          margin: EdgeInsets.zero,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(onTap: onTap, child: content),
+        ),
+      );
+    }
+
+    return Pressable(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(DL.rButton),
+          onTap: onTap,
+          child: content,
+        ),
       ),
     );
   }
