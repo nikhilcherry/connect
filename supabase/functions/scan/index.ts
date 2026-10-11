@@ -146,7 +146,15 @@ async function sweepPhotos() {
 type Tag = {
   code: string;
   owner: string;
-  vehicle: { id: string; make: string; model: string; colour: string | null; reg_number: string };
+  vehicle: {
+    id: string;
+    make: string;
+    model: string;
+    colour: string | null;
+    reg_number: string;
+    back_at?: string | null;
+    away_note?: string | null;
+  };
 };
 
 async function activeTag(code: unknown): Promise<Tag | null> {
@@ -155,7 +163,7 @@ async function activeTag(code: unknown): Promise<Tag | null> {
   if (!CODE_RE.test(c)) return null;
   const { data } = await db
     .from("tags")
-    .select("code, owner, active, vehicle:vehicles(id, make, model, colour, reg_number)")
+    .select("code, owner, active, vehicle:vehicles(id, make, model, colour, reg_number, back_at, away_note)")
     .eq("code", c)
     .maybeSingle();
   if (!data || !data.active || !data.vehicle) return null;
@@ -187,7 +195,13 @@ Deno.serve(async (req) => {
       const tag = await activeTag(body.code);
       if (!tag) return json({ error: "tag_not_found" }, 404);
       const v = tag.vehicle;
-      return json({ code: tag.code, make: v.make, model: v.model, colour: v.colour });
+      return json({
+        code: tag.code,
+        make: v.make,
+        model: v.model,
+        colour: v.colour,
+        owner_status: ownerStatus(v),
+      });
     }
 
     // Plate-as-QR: the phone read a plate with on-device OCR. Answers only with
