@@ -76,6 +76,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> bootstrap() async {
+    _watchCarried();
     loading = true;
     loadError = null;
     notifyListeners();
@@ -301,6 +302,20 @@ class AppState extends ChangeNotifier {
   }
 
   // ---------------------------------------------------------------- lifecycle + push
+
+  Timer? _carry;
+
+  /// A message this phone is carrying (heard or sent with no signal) is handed to the server as
+  /// soon as the phone is back online. Nothing tells the app the signal returned, so look
+  /// every 20 s while it is on screen; it costs nothing when nothing is being carried.
+  void _watchCarried() {
+    _carry ??= Timer.periodic(const Duration(seconds: 20), (_) {
+      if (!_foreground) return;
+      if (WhisperStore.heard.value.any((h) => h.state == WhisperState.carrying)) {
+        unawaited(WhisperStore.flush(deliverWhisper));
+      }
+    });
+  }
 
   /// True once this device has an FCM token registered. Alerts then reach a
   /// closed app by push, so the realtime socket is only held while the app is
@@ -787,6 +802,7 @@ class AppState extends ChangeNotifier {
     _unsubscribeAll();
     _retry?.cancel();
     _save?.cancel();
+    _carry?.cancel();
     super.dispose();
   }
 }
