@@ -1,7 +1,12 @@
 import base64
 import contextlib
+import email
+import email.policy
 import io
 import json
+import shutil
+import ssl
+import subprocess
 import tempfile
 import threading
 import unittest
@@ -12,6 +17,7 @@ import zipfile
 from pathlib import Path
 
 import server
+import smtp_sink
 
 JPEG = b"\xff\xd8\xff\xe0" + b"fake-jpeg-bytes" * 20 + b"\xff\xd9"
 
@@ -267,6 +273,105 @@ class PacketAndForward(Base):
         self.assertFalse(ok)
         self.assertIn("smtp down", why)
         self.assertIsNone(self.store.get(rid)["forwarded_at"])
+
+
+class RealMail(unittest.TestCase):
+    """The email step through a real SMTP conversation (smtp_sink), not an injected fake."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.sink = smtp_sink.Sink(("127.0.0.1", 0), Path(self.tmp.name) / "inbox")
+        threading.Thread(target=self.sink.serve_forever, daemon=True).start()
+        self.port = self.sink.server_address[1]
+        smtp = {"host": "127.0.0.1", "port": str(self.port), "security": "none", "to": "police@example.org, desk@example.org",
+                "from": "verifier@example.org"}
+        self.cfg = server.Config(Path(self.tmp.name) / "data", "s" * 64, "rev", "pw", "", smtp)  # no send_mail: the real path
+        self.store = server.Store(self.cfg)
+
+    def tearDown(self):
+        self.sink.shutdown()
+        self.sink.server_close()
+        self.store.close()
+        self.tmp.cleanup()
+
+    def approved(self):
+        code, out = self.store.ingest(fields(), {"frame": JPEG, "plate": JPEG, "vehicle": JPEG})
+        self.assertEqual(code, 201)
+        self.store.review(out["id"], "rev", "approved", "checked", "KA01AB1234")
+        return out["id"]
+
+    def test_the_test_email_arrives(self):
+        ok, why = server.send_test_email(self.cfg)
+        self.assertTrue(ok, why)
+        self.assertEqual(self.sink.count, 1)
+
+    def test_an_approved_report_is_emailed_with_its_packet(self):
+        rid = self.approved()
+        ok, why = self.store.forward(rid, "rev")
+        self.assertTrue(ok, why)
+        self.assertEqual(self.sink.count, 1)
+        msg = email.message_from_bytes(self.sink.saved[0].read_bytes(), policy=email.policy.default)
+        self.assertIn(rid, msg["Subject"])
+        self.assertIn("desk@example.org", msg["To"])
+        atts = list(msg.iter_attachments())
+        self.assertEqual([a.get_filename() for a in atts], [rid + ".zip"])
+        z = zipfile.ZipFile(io.BytesIO(atts[0].get_payload(decode=True)))
+        self.assertEqual(sorted(z.namelist()), ["frame.jpg", "manifest.json", "packet.html", "plate.jpg", "vehicle.jpg"])
+        m = json.loads(z.read("manifest.json"))
+        self.assertEqual(m["plate_confirmed_by_reviewer"], "KA01AB1234")
+        self.assertTrue(m["integrity"]["intact_at_export"])
+        self.assertIsNotNone(self.store.get(rid)["forwarded_at"])
+
+    def test_a_dead_mail_server_is_reported_and_nothing_is_marked_sent(self):
+        rid = self.approved()
+        self.cfg.smtp["port"] = "1"  # nothing listens here
+        ok, why = self.store.forward(rid, "rev")
+        self.assertFalse(ok)
+        self.assertTrue(why)
+        self.assertIsNone(self.store.get(rid)["forwarded_at"])
+        self.assertIn("forward_failed", [a["action"] for a in self.store.audit_for(rid)])
+        self.assertEqual(self.sink.count, 0)
+
+    def test_unconfigured_and_bad_security_are_clear_errors(self):
+        empty = server.Config(Path(self.tmp.name) / "d2", "s" * 64, "rev", "pw", "", {})
+        ok, why = server.send_test_email(empty)
+        self.assertFalse(ok)
+        self.assertIn("SMTP is not configured", why)
+        bad = server.Config(Path(self.tmp.name) / "d3", "s" * 64, "rev", "pw", "", {"host": "x", "to": "y", "security": "magic"})
+        ok, why = server.send_test_email(bad)
+        self.assertFalse(ok)
+        self.assertIn("SMTP_SECURITY", why)
+
+    def test_port_465_means_implicit_tls_by_default(self):
+        # Nothing listens with TLS here, so it must fail as a TLS error, proving the ssl path was chosen.
+        cfg = server.Config(Path(self.tmp.name) / "d4", "s" * 64, "rev", "pw", "", {"host": "127.0.0.1", "port": str(self.port), "to": "y"})
+        cfg.smtp["port"] = "465"
+        ok, why = server.send_test_email(cfg)
+        self.assertFalse(ok)
+
+
+@unittest.skipUnless(shutil.which("openssl"), "openssl is needed to make a test certificate")
+class Https(unittest.TestCase):
+    def test_the_console_can_serve_https(self):
+        with tempfile.TemporaryDirectory() as d:
+            cert, key = str(Path(d) / "c.pem"), str(Path(d) / "k.pem")
+            subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", key, "-out", cert, "-days", "1",
+                            "-subj", "/CN=localhost"], check=True, capture_output=True)
+            cfg = server.Config(Path(d) / "data", "s" * 64, "rev", "pw", "")
+            srv = server.make_server(cfg, "127.0.0.1", 0)
+            server.enable_tls(srv, cert, key)
+            threading.Thread(target=srv.serve_forever, daemon=True).start()
+            try:
+                ctx = ssl.create_default_context(cafile=cert)
+                with urllib.request.urlopen("https://localhost:%d/healthz" % srv.server_address[1], context=ctx) as r:
+                    self.assertEqual(json.loads(r.read()), {"ok": True})
+                # Plain http to the same port is not understood.
+                with self.assertRaises(Exception):
+                    urllib.request.urlopen("http://127.0.0.1:%d/healthz" % srv.server_address[1], timeout=3)
+            finally:
+                srv.shutdown()
+                srv.server_close()
+                srv.store.close()
 
 
 class Purge(Base):

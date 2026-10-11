@@ -29,18 +29,32 @@ It prints the reviewer login. Settings (environment variables):
 | --- | --- |
 | `REVIEW_USER`, `REVIEW_PASS` | Reviewer sign-in. If no password is set, one is generated into `data/reviewer-password.txt`. |
 | `VERIFIER_KEY` | If set, the webhook requires this value in the `X-Api-Key` header. Set it. |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_TO` | Where "Email to the authority" sends. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_TO` | Where "Email to the authority" sends. `SMTP_TO` may list several addresses, separated by commas. |
+| `SMTP_SECURITY` | `starttls` (the default; port 587), `ssl` (the default on port 465) or `none` (local testing only). |
 
 Point the app at it: `--dart-define=VIOLATION_WEBHOOK_URL=http://<host>:8787/webhook/traffic-violation
 --dart-define=VIOLATION_WEBHOOK_KEY=<VERIFIER_KEY>`. For a phone on USB: `adb reverse tcp:8787 tcp:8787`
 and use `http://127.0.0.1:8787/...`.
 
-Tests: `python -m unittest test_verifier` (21 tests, no network, standard library only).
+**Check the email before relying on it:** `python server.py --test-email` sends a short message through the same
+path approved reports use, and says plainly if it could not.
+
+**Try the email without a mail account:** `python smtp_sink.py` is a tiny local mail server that saves every
+message as a `.eml` file (attachments included). Run the console with
+`SMTP_HOST=127.0.0.1 SMTP_PORT=2525 SMTP_SECURITY=none SMTP_TO=police@example.org` and approve a report, then
+open the file in `inbox/`.
+
+**HTTPS:** `python server.py --tls-cert cert.pem --tls-key key.pem` serves HTTPS (TLS 1.2 or newer). A phone will only
+trust a certificate from a real authority (or one you install on it), so for a real host use one from your domain,
+or put it behind a proxy that has one.
+
+Tests: `python -m unittest test_verifier` (28 tests, standard library only; they include a real SMTP conversation
+and, when `openssl` is installed, real HTTPS).
 
 ## Before this is used for anything real
 
-- **HTTPS and hosting.** It speaks plain HTTP and binds to `127.0.0.1`. Put it behind a TLS terminator
-  (a reverse proxy) before exposing it; do not expose it as it is.
+- **HTTPS and hosting.** By default it speaks plain HTTP and binds to `127.0.0.1`. Before exposing it, serve HTTPS
+  (`--tls-cert` / `--tls-key`, or a reverse proxy) with a certificate phones trust; never expose plain HTTP.
 - **Reviewers.** There is one shared login. Real use needs individual accounts and roles.
 - **Anonymous, but not untraceable.** The report carries nothing that names the reporter, but the network
   can still see who connected: the hosting provider, or any proxy in front of this server, sees the caller's

@@ -59,16 +59,42 @@ class Config:
         self.smtp = smtp or {}
         self.send_mail = send_mail or self._smtp_send
 
+    def smtp_ready(self):
+        return bool(self.smtp.get("host") and self.smtp.get("to"))
+
     def _smtp_send(self, msg):
+        """Sends through the configured mail server. security: starttls (port 587), ssl (port 465) or none."""
         s = self.smtp
-        if not s.get("host") or not s.get("to"):
+        if not self.smtp_ready():
             raise RuntimeError("SMTP is not configured (set SMTP_HOST and SMTP_TO)")
-        with smtplib.SMTP(s["host"], int(s.get("port", 587)), timeout=30) as c:
-            if s.get("starttls", True):
+        port = int(s.get("port", 587))
+        security = (s.get("security") or ("ssl" if port == 465 else "starttls")).lower()
+        if security not in ("starttls", "ssl", "none"):
+            raise RuntimeError("SMTP_SECURITY must be starttls, ssl or none")
+        if security == "ssl":
+            conn = smtplib.SMTP_SSL(s["host"], port, timeout=30)
+        else:
+            conn = smtplib.SMTP(s["host"], port, timeout=30)
+        with conn as c:
+            if security == "starttls":
                 c.starttls()
             if s.get("user"):
                 c.login(s["user"], s.get("password", ""))
             c.send_message(msg)
+
+
+def send_test_email(cfg):
+    """Sends a short message through the same path approved reports use. Returns (ok, why)."""
+    msg = EmailMessage()
+    msg["Subject"] = "Verification console: test email"
+    msg["From"] = cfg.smtp.get("from", "verifier@localhost")
+    msg["To"] = cfg.smtp.get("to", "")
+    msg.set_content("If you can read this, the verification console can email approved reports to this address.")
+    try:
+        cfg.send_mail(msg)
+    except Exception as ex:
+        return False, "%s: %s" % (type(ex).__name__, ex)
+    return True, ""
 
 
 class Store:
@@ -495,8 +521,10 @@ class Handler(BaseHTTPRequestHandler):
                      '<span class="pill %s">%s</span>%s</div><div class=mut>%s &middot; %s &middot; %s</div></div></a></div>'
                      % (e(r["id"]), thumb, e(VIOLATIONS[r["violation"]]), e(r["status"]), e(r["status"]),
                         ' <span class="pill warn">possible duplicate</span>' if r["dup_of"] else "", e(plate), e(r["ts"]), e(r["id"])))
+        mail = ("Approved reports are emailed to <b>%s</b> through %s:%s." % (e(self.cfg.smtp["to"]), e(self.cfg.smtp["host"]), e(str(self.cfg.smtp.get("port", ""))))
+                if self.cfg.smtp_ready() else "Email forwarding is not set up (set SMTP_HOST and SMTP_TO). Packets can still be downloaded.")
         self.send(200, page("Reports", "<h1>Violation reports</h1><p class=sub>Review what the app sends. Nothing here is a challan.</p>"
-                            "<div class=tabs>%s</div>%s" % (tabs, rows or "<p class=mut>No reports yet.</p>")))
+                            "<p class=mut>%s</p><div class=tabs>%s</div>%s" % (mail, tabs, rows or "<p class=mut>No reports yet.</p>")))
 
     def detail(self, rid, user, err):
         r = self.store.get(rid)
@@ -561,6 +589,7 @@ def load_config(data_dir):
         return p.read_text().strip()
 
     smtp = {"host": os.environ.get("SMTP_HOST", ""), "port": os.environ.get("SMTP_PORT", "587"),
+            "security": os.environ.get("SMTP_SECURITY", ""),
             "user": os.environ.get("SMTP_USER", ""), "password": os.environ.get("SMTP_PASS", ""),
             "from": os.environ.get("SMTP_FROM", "verifier@localhost"), "to": os.environ.get("SMTP_TO", "")}
     return Config(
@@ -570,6 +599,15 @@ def load_config(data_dir):
         os.environ.get("VERIFIER_KEY", ""), smtp)
 
 
+def enable_tls(srv, cert, key):
+    """Makes the server speak HTTPS (TLS 1.2 or newer) with the given PEM certificate and key."""
+    import ssl
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+    ctx.load_cert_chain(cert, key)
+    srv.socket = ctx.wrap_socket(srv.socket, server_side=True)
+
+
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
@@ -577,13 +615,26 @@ if __name__ == "__main__":
     ap.add_argument("--port", type=int, default=8787)
     ap.add_argument("--data", default=str(Path(__file__).parent / "data"))
     ap.add_argument("--purge-days", type=int, help="delete reports older than this many days and exit")
+    ap.add_argument("--test-email", action="store_true", help="send a test email through the SMTP settings and exit")
+    ap.add_argument("--tls-cert", help="serve HTTPS with this certificate (PEM); needs --tls-key")
+    ap.add_argument("--tls-key", help="the certificate's private key (PEM)")
     a = ap.parse_args()
     cfg = load_config(a.data)
     if a.purge_days is not None:
         print("purged", Store(cfg).purge(a.purge_days), "reports")
         sys.exit(0)
+    if a.test_email:
+        ok, why = send_test_email(cfg)
+        print("test email sent to %s" % cfg.smtp.get("to") if ok else "test email FAILED: %s" % why)
+        sys.exit(0 if ok else 1)
     srv = make_server(cfg, a.host, a.port)
-    print("Verifier on http://%s:%d   reviewer: %s / %s" % (a.host, a.port, cfg.user, cfg.password))
+    scheme = "http"
+    if a.tls_cert or a.tls_key:
+        if not (a.tls_cert and a.tls_key):
+            sys.exit("--tls-cert and --tls-key go together")
+        enable_tls(srv, a.tls_cert, a.tls_key)
+        scheme = "https"
+    print("Verifier on %s://%s:%d   reviewer: %s / %s" % (scheme, a.host, a.port, cfg.user, cfg.password))
     if not cfg.api_key:
         print("WARNING: VERIFIER_KEY is not set, so anyone who can reach /webhook/traffic-violation can post reports.")
     try:
