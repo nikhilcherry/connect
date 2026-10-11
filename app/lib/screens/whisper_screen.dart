@@ -10,6 +10,8 @@ import '../data/models.dart';
 import '../l10n.dart';
 import '../main.dart';
 import '../services/acoustic_modem.dart';
+import '../services/ble_link.dart';
+import '../services/ble_relay.dart';
 import '../services/notifications.dart';
 import '../services/plate_reader.dart';
 import '../services/sound_link.dart';
@@ -47,6 +49,8 @@ class _WhisperScreenState extends State<WhisperScreen> {
 
   AlertKind _kind = AlertKind.blocking;
   bool _wanted = true; // the listening switch
+  bool _bleWanted = true; // the Bluetooth switch
+  bool _bleFailed = false;
   bool _micDenied = false;
   bool _audibleToo = true;
   bool _reading = false;
@@ -72,16 +76,26 @@ class _WhisperScreenState extends State<WhisperScreen> {
     // Android silences the microphone of an app that is not on screen.
     _life = AppLifecycleListener(onPause: _link.stopListening, onResume: _listenIfWanted);
     _listenIfWanted();
+    _bleIfWanted();
   }
 
   @override
   void dispose() {
+    unawaited(BleLink.instance.stop());
     _life.dispose();
     _frames?.cancel();
     _levels?.cancel();
     _plate.dispose();
     _link.dispose();
     super.dispose();
+  }
+
+  /// Bluetooth is asked for here, not at app launch, and runs only while this
+  /// screen is open, like the microphone.
+  Future<void> _bleIfWanted() async {
+    if (!_bleWanted || BleLink.instance.isOn) return;
+    final ok = await BleRelay.start(AppScope.read(context));
+    if (mounted) setState(() => _bleFailed = !ok);
   }
 
   Future<void> _listenIfWanted() async {
@@ -316,6 +330,43 @@ class _WhisperScreenState extends State<WhisperScreen> {
                 Switch(value: _audibleToo, onChanged: sending ? null : (on) => setState(() => _audibleToo = on)),
               ]),
             ]),
+          ),
+          const SizedBox(height: 12),
+          SectionCard(
+            child: ValueListenableBuilder<bool>(
+              valueListenable: BleLink.instance.running,
+              builder: (context, on, _) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Row(children: [
+                  PulseDot(color: on ? DL.success : DL.muted, pulse: on),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(on ? tr('Bluetooth relay on') : tr('Bluetooth relay off'), style: DLText.strong)),
+                  Switch(
+                    value: _bleWanted,
+                    onChanged: sending
+                        ? null
+                        : (v) async {
+                            setState(() {
+                              _bleWanted = v;
+                              _bleFailed = false;
+                            });
+                            v ? await _bleIfWanted() : await BleLink.instance.stop();
+                            if (mounted) setState(() {});
+                          },
+                  ),
+                ]),
+                const SizedBox(height: 8),
+                if (_bleFailed)
+                  Text(tr('Allow Bluetooth and turn it on so this phone can pass messages along.'), style: DLText.small.copyWith(color: DL.error))
+                else
+                  ValueListenableBuilder<int>(
+                    valueListenable: BleLink.instance.heard,
+                    builder: (context, n, _) => Text(
+                      on ? tr('Heard {n} from phones nearby. It reaches further than sound, and carried messages are repeated until someone delivers them.', {'n': n}) : tr('Off. Turn on to hand messages to phones nearby without internet.'),
+                      style: DLText.small,
+                    ),
+                  ),
+              ]),
+            ),
           ),
           const SizedBox(height: 32),
           Label(tr('Heard and carried')),
