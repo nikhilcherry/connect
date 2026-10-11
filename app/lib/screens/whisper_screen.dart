@@ -94,7 +94,9 @@ class _WhisperScreenState extends State<WhisperScreen> {
   /// screen is open, like the microphone.
   Future<void> _bleIfWanted() async {
     if (!_bleWanted || BleLink.instance.isOn) return;
-    final ok = await BleRelay.start(AppScope.read(context));
+    final scope = context.getInheritedWidgetOfExactType<AppScope>();
+    if (scope == null) return; // no app state to hand whispers to
+    final ok = await BleRelay.start(scope.notifier!);
     if (mounted) setState(() => _bleFailed = !ok);
   }
 
