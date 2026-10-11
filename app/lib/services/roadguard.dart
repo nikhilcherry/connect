@@ -24,6 +24,8 @@ class RoadStatus {
     this.videoIndex = 0,
     this.videoCount = 0,
     this.videoDone = false,
+    this.streamHost = '',
+    this.streamState = '',
     this.aiOn = false,
     this.aiCalls = 0,
     this.aiFail = 0,
@@ -61,6 +63,10 @@ class RoadStatus {
   final int videoCount;
   final bool videoDone;
 
+  /// While a live dashcam stream stands in for the camera: its host, and `connecting`, `live` or `lost`.
+  final String streamHost;
+  final String streamState;
+
   /// AI second opinion: on, how many checks were asked, how many failed, and what they cost (USD).
   final bool aiOn;
   final int aiCalls;
@@ -87,6 +93,8 @@ class RoadStatus {
       videoIndex: i('videoIndex'),
       videoCount: i('videoCount'),
       videoDone: m['videoDone'] == true,
+      streamHost: (m['streamHost'] as String?) ?? '',
+      streamState: (m['streamState'] as String?) ?? '',
       aiOn: m['aiOn'] == true,
       aiCalls: i('aiCalls'),
       aiFail: i('aiFail'),
@@ -193,6 +201,9 @@ class RoadGuard {
   /// Video clips to scan instead of the camera, for one drive. Cleared when the drive ends.
   static List<String>? videos;
 
+  /// A dashcam's live-view address (MJPEG over http) to scan instead of the camera, for one drive.
+  static String? stream;
+
   /// The user's choice; on by default.
   static final enabled = ValueNotifier<bool>(true);
 
@@ -237,7 +248,7 @@ class RoadGuard {
   /// Asks for camera access if needed, then starts the scan. False if it could not start.
   static Future<bool> start() async {
     try {
-      return await _channel.invokeMethod<bool>('start', {'demoDir': demoDir, 'ai': aiEnabled.value, 'videos': videos}) ?? false;
+      return await _channel.invokeMethod<bool>('start', {'demoDir': demoDir, 'ai': aiEnabled.value, 'videos': videos, 'stream': stream}) ?? false;
     } catch (_) {
       return false;
     }
@@ -257,6 +268,7 @@ class RoadGuard {
       await _channel.invokeMethod<void>('stop');
     } catch (_) {}
     videos = null;
+    stream = null;
   }
 
   /// Opens the system picker for one or more video clips; their addresses, or none if cancelled.

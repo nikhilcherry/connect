@@ -36,11 +36,12 @@ object RoadGuardBridge {
     /** True when this build has an OpenRouter key, so the AI second opinion can be offered. */
     fun aiAvailable(): Boolean = BuildConfig.OPENROUTER_API_KEY.isNotBlank()
 
-    fun start(context: Context, demoDir: String? = null, ai: Boolean = false, videos: List<String>? = null): Boolean {
+    fun start(context: Context, demoDir: String? = null, ai: Boolean = false, videos: List<String>? = null, stream: String? = null): Boolean {
         if (!available()) return false
         val intent = Intent(context, DetectionService::class.java)
         if (demoDir != null) intent.putExtra("demoDir", demoDir)
         if (!videos.isNullOrEmpty()) intent.putStringArrayListExtra("videos", ArrayList(videos))
+        if (!stream.isNullOrBlank()) intent.putExtra("stream", stream)
         intent.putExtra("ai", ai)
         ContextCompat.startForegroundService(context, intent)
         return true
@@ -78,6 +79,8 @@ object RoadGuardBridge {
             "videoIndex" to (Hub.video?.index ?: 0),
             "videoCount" to (Hub.video?.count ?: 0),
             "videoDone" to Hub.videoDone,
+            "streamHost" to (Hub.stream?.host ?: ""),
+            "streamState" to (Hub.stream?.state ?: ""),
             "aiOn" to (p?.ai?.enabled == true),
             "aiCalls" to (p?.ai?.calls ?: 0),
             "aiFail" to (p?.ai?.failures ?: 0),

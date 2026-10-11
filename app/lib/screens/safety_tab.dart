@@ -13,6 +13,7 @@ import '../config.dart';
 import '../l10n.dart';
 import '../main.dart';
 import '../services/crash_detector.dart';
+import '../services/dashcam_stream.dart';
 import '../services/roadguard.dart';
 import '../services/trip_share.dart';
 import '../theme.dart';
@@ -25,33 +26,90 @@ import 'witness_screen.dart';
 class SafetyTab extends StatelessWidget {
   const SafetyTab({super.key});
 
-  /// Choose dashcam footage (some clips, or a whole folder) and run Drive Mode's road scan on it instead of the
-  /// camera. Each event keeps the clip's own time and place.
+  /// Use a dashcam instead of the phone's camera: its live view over Wi-Fi, or its footage (some clips, or a
+  /// whole folder). Footage keeps each clip's own time and place.
   Future<void> _scanVideo(BuildContext context) async {
-    final folder = await showModalBottomSheet<bool>(
+    final choice = await showModalBottomSheet<String>(
       context: context,
       builder: (ctx) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           ListTile(
+            leading: const Icon(Icons.wifi_tethering),
+            title: Text(tr('Connect a dashcam')),
+            subtitle: Text(tr('Live video over its Wi-Fi')),
+            onTap: () => Navigator.of(ctx).pop('dashcam'),
+          ),
+          ListTile(
             leading: const Icon(Icons.video_library_outlined),
             title: Text(tr('Pick videos')),
             subtitle: Text(tr('One or more clips')),
-            onTap: () => Navigator.of(ctx).pop(false),
+            onTap: () => Navigator.of(ctx).pop('videos'),
           ),
           ListTile(
             leading: const Icon(Icons.folder_open_outlined),
             title: Text(tr('Pick a folder')),
             subtitle: Text(tr('All the clips in a dashcam folder')),
-            onTap: () => Navigator.of(ctx).pop(true),
+            onTap: () => Navigator.of(ctx).pop('folder'),
           ),
         ]),
       ),
     );
-    if (folder == null || !context.mounted) return;
-    final clips = folder ? await RoadGuard.pickVideoFolder() : await RoadGuard.pickVideos();
+    if (choice == null || !context.mounted) return;
+    if (choice == 'dashcam') {
+      final url = await _askDashcam(context);
+      if (url == null || !context.mounted) return;
+      await DashcamAddress.remember(url);
+      RoadGuard.stream = url;
+      if (!context.mounted) return;
+      push(context, const DriveModeScreen());
+      return;
+    }
+    final clips = choice == 'folder' ? await RoadGuard.pickVideoFolder() : await RoadGuard.pickVideos();
     if (clips.isEmpty || !context.mounted) return;
     RoadGuard.videos = clips;
     push(context, const DriveModeScreen());
+  }
+
+  /// Asks for the dashcam's live-view address; null if cancelled.
+  Future<String?> _askDashcam(BuildContext context) async {
+    final field = TextEditingController(text: await DashcamAddress.lastUsed());
+    if (!context.mounted) return null;
+    String? error;
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setInner) => AlertDialog(
+          title: Text(tr('Connect a dashcam')),
+          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(tr('Its live-view address, for example http://192.168.1.254:8192. Join the dashcam\'s Wi-Fi first.'), style: DLText.small),
+            const SizedBox(height: 12),
+            TextField(
+              controller: field,
+              keyboardType: TextInputType.url,
+              autocorrect: false,
+              decoration: InputDecoration(labelText: tr('Dashcam address'), hintText: 'http://192.168.1.254:8192', errorText: error),
+            ),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(tr('Cancel'))),
+            FilledButton(
+              onPressed: () {
+                final a = DashcamAddress.parse(field.text);
+                if (a.ok) {
+                  Navigator.of(ctx).pop(a.url);
+                } else {
+                  setInner(() => error = switch (a.error!) {
+                        DashcamAddressError.rtsp => tr('RTSP streams aren\'t supported yet. Use the dashcam\'s MJPEG (http) address.'),
+                        _ => tr('Enter the dashcam\'s address, like http://192.168.1.254:8192'),
+                      });
+                }
+              },
+              child: Text(tr('Connect')),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -127,7 +185,7 @@ class SafetyTab extends StatelessWidget {
               width: double.infinity,
               child: OutlinedButton.icon(
                 icon: const Icon(Icons.video_library_outlined),
-                label: Text(tr('Scan a video instead')),
+                label: Text(tr('Use a dashcam or video')),
                 onPressed: s.contacts.isEmpty ? null : () => _scanVideo(context),
               ),
             ),
@@ -832,9 +890,15 @@ class _RoadPanel extends StatelessWidget {
               ? tr('Paused to cool the phone')
               : s.thermal >= 2
                   ? tr('Phone is warm: scanning slower')
-                  : s.videoCount > 0
-                      ? tr('Clip {i} of {n}: {name}', {'i': '${s.videoIndex}', 'n': '${s.videoCount}', 'name': s.videoClip})
-                      : tr('Scanning the road'),
+                  : s.streamHost.isNotEmpty
+                      ? switch (s.streamState) {
+                          'live' => tr('Dashcam: {host}', {'host': s.streamHost}),
+                          'lost' => tr('Dashcam connection lost. Reconnecting...'),
+                          _ => tr('Connecting to the dashcam...'),
+                        }
+                      : s.videoCount > 0
+                          ? tr('Clip {i} of {n}: {name}', {'i': '${s.videoIndex}', 'n': '${s.videoCount}', 'name': s.videoClip})
+                          : tr('Scanning the road'),
     };
     final last = live ? _lastLabel(s.last) : null;
     return ConstrainedBox(
@@ -854,6 +918,16 @@ class _RoadPanel extends StatelessWidget {
                   ? const ColoredBox(color: Colors.black, child: Center(child: SizedBox.square(dimension: 22, child: CircularProgressIndicator(strokeWidth: 2, color: DL.onDarkMuted))))
                   : Stack(fit: StackFit.expand, children: [
                       ColoredBox(color: Colors.black, child: Image.memory(frame!, fit: BoxFit.contain, gaplessPlayback: true)),
+                      if (s != null && s.streamHost.isNotEmpty)
+                        Positioned(
+                          left: 8,
+                          top: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            color: DL.success,
+                            child: Text(tr('Live from a dashcam'), style: DLText.small.copyWith(color: DL.onDark, fontWeight: FontWeight.w700)),
+                          ),
+                        ),
                       if (s != null && s.demo)
                         Positioned(
                           left: 8,

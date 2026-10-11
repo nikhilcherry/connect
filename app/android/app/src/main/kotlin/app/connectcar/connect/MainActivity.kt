@@ -31,6 +31,7 @@ class MainActivity : FlutterActivity() {
     private var pendingRoadDemoDir: String? = null
     private var pendingRoadAi = false
     private var pendingRoadVideos: List<String>? = null
+    private var pendingRoadStream: String? = null
     private var pendingPick: MethodChannel.Result? = null
 
     private fun roadPermissions(): List<String> = buildList {
@@ -39,14 +40,14 @@ class MainActivity : FlutterActivity() {
         if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.POST_NOTIFICATIONS)
     }
 
-    private fun startRoadScan(demoDir: String?, ai: Boolean, videos: List<String>?, result: MethodChannel.Result) {
+    private fun startRoadScan(demoDir: String?, ai: Boolean, videos: List<String>?, stream: String?, result: MethodChannel.Result) {
         if (!RoadGuardBridge.available()) {
             result.success(false)
             return
         }
         val missing = roadPermissions().filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isEmpty()) {
-            result.success(RoadGuardBridge.start(this, demoDir, ai, videos))
+            result.success(RoadGuardBridge.start(this, demoDir, ai, videos, stream))
             return
         }
         if (pendingRoadStart != null) {
@@ -57,6 +58,7 @@ class MainActivity : FlutterActivity() {
         pendingRoadDemoDir = demoDir
         pendingRoadAi = ai
         pendingRoadVideos = videos
+        pendingRoadStream = stream
         ActivityCompat.requestPermissions(this, missing.toTypedArray(), ROAD_PERMISSION_REQUEST)
     }
 
@@ -67,7 +69,7 @@ class MainActivity : FlutterActivity() {
         pendingRoadStart = null
         // Camera is required; location (for map pins) and notifications are optional.
         val cameraOk = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        r.success(cameraOk && RoadGuardBridge.start(this, pendingRoadDemoDir, pendingRoadAi, pendingRoadVideos))
+        r.success(cameraOk && RoadGuardBridge.start(this, pendingRoadDemoDir, pendingRoadAi, pendingRoadVideos, pendingRoadStream))
     }
 
     /** Opens the system picker for dashcam footage: several clips, or a whole folder. Answers with the clips' URIs. */
@@ -152,7 +154,7 @@ class MainActivity : FlutterActivity() {
             try {
                 when (call.method) {
                     "available" -> result.success(RoadGuardBridge.available())
-                    "start" -> startRoadScan(call.argument<String>("demoDir"), call.argument<Boolean>("ai") == true, call.argument<List<String>>("videos"), result)
+                    "start" -> startRoadScan(call.argument<String>("demoDir"), call.argument<Boolean>("ai") == true, call.argument<List<String>>("videos"), call.argument<String>("stream"), result)
                     "pickVideos" -> pick(result, false)
                     "pickVideoFolder" -> pick(result, true)
                     "aiAvailable" -> result.success(RoadGuardBridge.aiAvailable())

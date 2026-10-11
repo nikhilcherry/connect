@@ -21,6 +21,7 @@ class DetectionService : LifecycleService() {
     private var runner: CameraRunner? = null
     private var demo: DemoRunner? = null
     private var video: VideoRunner? = null
+    private var stream: StreamRunner? = null
     private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -53,7 +54,11 @@ class DetectionService : LifecycleService() {
         Hub.pipeline?.ai?.enabled = intent?.getBooleanExtra("ai", false) == true
         val demoDir = intent?.getStringExtra("demoDir")
         val videos = intent?.getStringArrayListExtra("videos")
-        if (!videos.isNullOrEmpty()) {
+        val streamUrl = intent?.getStringExtra("stream")
+        if (!streamUrl.isNullOrBlank()) {
+            // A live dashcam stream, in place of the camera.
+            if (stream == null) stream = StreamRunner(streamUrl)
+        } else if (!videos.isNullOrEmpty()) {
             // Video clips the person picked, scanned in place of the camera.
             if (video == null) video = VideoRunner(this, ClipReader.sources(this, videos))
         } else if (demoDir != null) {
@@ -77,6 +82,8 @@ class DetectionService : LifecycleService() {
         demo = null
         video?.stop()
         video = null
+        stream?.stop()
+        stream = null
         wakeLock?.let { if (it.isHeld) it.release() }
         Hub.stop()
         super.onDestroy()

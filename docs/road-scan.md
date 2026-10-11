@@ -203,6 +203,28 @@ camera sees now, to check the plate crop and text.
 adb shell "run-as <package> am start-foreground-service --user 0 -n <package>/com.iqoo.roadguard.DetectionService -a com.iqoo.roadguard.TEST_CAPTURE"
 ```
 
+## Live dashcam input
+
+**Use a dashcam or video -> Connect a dashcam** runs the same on-device road scan on a dashcam's live view in place
+of the phone's own camera. Enter its live-view address, for example `http://192.168.1.254:8192`, after joining the
+dashcam's Wi-Fi. The address is remembered for next time. The live card is labelled "Live from a dashcam" and shows
+"Dashcam: <host>", "Connecting to the dashcam..." or "Dashcam connection lost. Reconnecting...".
+
+- **What it reads:** MJPEG over plain HTTP, the live preview many Wi-Fi dashcams and phone-as-camera apps serve.
+  RTSP (H.264) is the other common choice and is **not supported yet**; the app says so if you enter an `rtsp://`
+  address. Which address your dashcam uses is in its manual; I have not tested a real dashcam.
+- **How:** a plain socket request (Android blocks ordinary HTTP clients from cleartext in release apps, and a
+  dashcam on its own Wi-Fi speaks plain HTTP). The reader keeps only the newest frame, so a slow phone never builds
+  up delay, and it reconnects with a growing wait if the stream drops. A `user:pass@host` sign-in is sent as
+  Basic auth. Chunked streams are refused with a clear message in the log.
+- **Place and time:** the phone is in the car, so events take the phone's place and the moment they are seen, exactly
+  as with its own camera. There is no full-resolution still in this mode, so a plate is read from the stream frame.
+- **Internet while on the dashcam's Wi-Fi:** the AI double-check and reports need the internet. Android normally keeps
+  mobile data for that when the Wi-Fi has none; check this on your phone before relying on it.
+- **Try it without a dashcam:** `tools/dashcam_sim.py clip.mp4` serves any video as a live MJPEG stream. On USB, run
+  `adb reverse tcp:8190 tcp:8190` and connect to `http://127.0.0.1:8190/video`; on Wi-Fi use this computer's address.
+  It needs OpenCV and serves plain HTTP with no sign-in, so use a trusted network.
+
 ## Scanning dashcam footage
 
 **Scan a video instead** (under Start Drive Mode on the Safety tab) offers **Pick videos** (one or more clips)

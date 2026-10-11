@@ -43,6 +43,9 @@ object Hub {
     @Volatile var video: VideoProgress? = null
     @Volatile var videoDone = false
 
+    /** While a live dashcam stream stands in for the camera: its host and whether it is connecting, live or lost. */
+    @Volatile var stream: StreamProgress? = null
+
     val pipeline: Pipeline? get() = pipelineRef
 
     /** Counters at the moment a drive started, so the UI can show this drive only. */
@@ -66,6 +69,7 @@ object Hub {
         stillSource = null
         video = null
         videoDone = false
+        stream = null
         fps = 0f
     }
 
