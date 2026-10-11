@@ -75,8 +75,9 @@ class _WhisperScreenState extends State<WhisperScreen> {
     _levels = _link.levels.listen(_onLevel);
     // Android silences the microphone of an app that is not on screen.
     _life = AppLifecycleListener(onPause: _link.stopListening, onResume: _listenIfWanted);
-    _listenIfWanted();
-    _bleIfWanted();
+    // Android shows one permission dialog at a time and drops a second request
+    // made meanwhile, so Bluetooth asks only once the microphone has answered.
+    _listenIfWanted().whenComplete(_bleIfWanted);
   }
 
   @override
@@ -96,7 +97,7 @@ class _WhisperScreenState extends State<WhisperScreen> {
     if (!_bleWanted || BleLink.instance.isOn) return;
     final scope = context.getInheritedWidgetOfExactType<AppScope>();
     if (scope == null) return; // no app state to hand whispers to
-    final ok = await BleRelay.start(scope.notifier!);
+    final ok = await BleRelay.start(scope.notifier!).timeout(const Duration(seconds: 25), onTimeout: () => false);
     if (mounted) setState(() => _bleFailed = !ok);
   }
 
