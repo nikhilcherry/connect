@@ -31,7 +31,7 @@ status() {
   row backend "$(ok "$(code $API/rest/v1/)" 200)" "API $API   Studio http://127.0.0.1:54323"
   row functions "$(ok "$(scan_code)" 404)" "scan, notify, rc-lookup, vehicle-vision (404 for an unknown tag is right)"
   row scanpage "$(ok "$(code http://127.0.0.1:$SCAN_PORT/)" 200)" "http://127.0.0.1:$SCAN_PORT/t/<TAG>"
-  row n8n "$(ok "$(code http://127.0.0.1:$N8N_PORT/healthz)" 200)" "http://127.0.0.1:$N8N_PORT  (webhooks: /webhook/connect-alert, /webhook/connect-whisper)"
+  row n8n "$(ok "$(code http://127.0.0.1:$N8N_PORT/healthz)" 200)" "http://127.0.0.1:$N8N_PORT  (webhooks: connect-alert, connect-whisper, traffic-violation)"
   [ -z "${JEV_API_KEY:-}" ] && echo "  note: JEV_API_KEY / OPENROUTER_API_KEY not set in .env, the n8n demo will answer with errors"
 }
 

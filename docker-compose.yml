@@ -47,10 +47,12 @@ services:
       WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://localhost:5678/}
       JEV_API_KEY: ${JEV_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      DEMO_INBOX: ${DEMO_INBOX:-}
     volumes:
       - ./docker/n8n/start.sh:/start.sh:ro
       - ./docker/n8n/alert-flow.json:/seed/alert-flow.json:ro
       - ./docker/n8n/whisper-relay.json:/seed/whisper-relay.json:ro
+      - ./docker/n8n/violation-dispatcher.json:/seed/violation-dispatcher.json:ro
       - n8n_data:/home/node/.n8n
     ports:
       - "${N8N_PORT:-5678}:5678"

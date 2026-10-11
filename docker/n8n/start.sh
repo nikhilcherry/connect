@@ -15,7 +15,11 @@ JSON
 n8n import:credentials --input=/tmp/seed/creds.json
 n8n import:workflow --input=/seed/alert-flow.json
 n8n import:workflow --input=/seed/whisper-relay.json
+# The violation dispatcher emails a demo inbox (DEMO_INBOX); real stations are set in its routing table.
+sed "s/DEMO_INBOX_PLACEHOLDER@example.com/${DEMO_INBOX:-you@example.com}/g" /seed/violation-dispatcher.json > /tmp/seed/violation-dispatcher.json
+n8n import:workflow --input=/tmp/seed/violation-dispatcher.json
 n8n publish:workflow --id=cZxnlGpLKAlDq4cH
 n8n publish:workflow --id=sP1Bke2lWm5hjfUZ
+n8n publish:workflow --id=va5wUJu6zXoyDByd
 rm -rf /tmp/seed
 exec n8n start
