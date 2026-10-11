@@ -180,15 +180,6 @@ class SafetyTab extends StatelessWidget {
                 onPressed: s.contacts.isEmpty ? null : () => push(context, const DriveModeScreen()),
               ),
             ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.video_library_outlined),
-                label: Text(tr('Use a dashcam or video')),
-                onPressed: s.contacts.isEmpty ? null : () => _scanVideo(context),
-              ),
-            ),
             if (s.contacts.isEmpty) ...[
               const SizedBox(height: 10),
               Text(tr('Add an emergency contact below first.'), style: DLText.small),
@@ -285,6 +276,16 @@ class SafetyTab extends StatelessWidget {
                     ]),
                   ),
                 ),
+        ),
+        const SizedBox(height: 32),
+
+        Label(tr('More ways to scan')),
+        const SizedBox(height: 12),
+        InfoRow(
+          icon: Icons.wifi_tethering,
+          title: tr('Use a dashcam or video'),
+          subtitle: tr('Scan a dashcam\'s live view, or clips saved from it.'),
+          onTap: s.contacts.isEmpty ? null : () => _scanVideo(context),
         ),
       ])),
     );

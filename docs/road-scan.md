@@ -205,7 +205,7 @@ adb shell "run-as <package> am start-foreground-service --user 0 -n <package>/co
 
 ## Live dashcam input
 
-**Use a dashcam or video -> Connect a dashcam** runs the same on-device road scan on a dashcam's live view in place
+**More ways to scan -> Use a dashcam or video -> Connect a dashcam** runs the same on-device road scan on a dashcam's live view in place
 of the phone's own camera. Enter its live-view address, for example `http://192.168.1.254:8192`, after joining the
 dashcam's Wi-Fi. The address is remembered for next time. The live card is labelled "Live from a dashcam" and shows
 "Dashcam: <host>", "Connecting to the dashcam..." or "Dashcam connection lost. Reconnecting...".
@@ -227,7 +227,7 @@ dashcam's Wi-Fi. The address is remembered for next time. The live card is label
 
 ## Scanning dashcam footage
 
-**Scan a video instead** (under Start Drive Mode on the Safety tab) offers **Pick videos** (one or more clips)
+**Use a dashcam or video** (the last row of the Safety tab, under "More ways to scan") offers **Pick videos** (one or more clips)
 or **Pick a folder** (every clip in it, and in sub-folders a few levels down, oldest name first). The road scan
 then runs on those clips in place of the camera, one after another, each once. The live card is labelled
 "Footage from a video, not the camera" and shows "Clip 2 of 7: name". When the last clip ends, the scan stops
