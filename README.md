@@ -5,9 +5,9 @@
 
 ![license](https://img.shields.io/badge/license-MIT-lightgrey) ![platform](https://img.shields.io/badge/Android-Flutter-02569B) ![backend](https://img.shields.io/badge/backend-Supabase-3ecf8e) ![cost](https://img.shields.io/badge/running%20cost-%E2%82%B90-3fb950) ![languages](https://img.shields.io/badge/EN%20%C2%B7%20%E0%A4%B9%E0%A4%BF%20%C2%B7%20%E0%B2%95%20%C2%B7%20%E0%AE%A4-4%20languages-5a45c9)
 
-<img src="docs/screens/flow.gif" alt="A stranger scans a windshield tag, picks the problem, proves they are at the car, and the owner replies in seconds" width="260">
+<a href="https://youtube.com/shorts/r2QJgsw-6Nk"><img src="docs/screens/flow.gif" alt="A stranger scans a windshield tag, picks the problem, proves they are at the car, and the owner replies in seconds" width="260"></a>
 
-<sub>Scan, pick the problem, type the plate's last 4 characters, the owner is pinged, the owner replies. Animated walkthrough from the launch reel.</sub>
+<sub>Scan, pick the problem, type the plate's last 4 characters, the owner is pinged, the owner replies. Animated walkthrough from the launch reel. ▶ [Watch the full reel on YouTube](https://youtube.com/shorts/r2QJgsw-6Nk).</sub>
 
 </div>
 
