@@ -76,6 +76,10 @@ Safety → *Witness mode*: leave a phone on the dashboard of a parked car. Our p
 
 ## How it works
 
+![Architecture: a stranger's scan goes through one edge function into Postgres; the owner's app gets an FCM push and reads its own rows through RLS](docs/architecture.svg)
+
+The same flow as text:
+
 ```
 stranger's phone ──► web/index.html ──► functions/v1/scan ──(service role)──► Postgres + Storage
 family's browser ──► web/trip.html  ──►        │                                   │ realtime

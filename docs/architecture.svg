@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 420" font-family="Inter, system-ui, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#5b4bc4"/></marker>
+    <style>
+      .bg{fill:#f4f2fc}.box{fill:#fff;stroke:#cfc9ee;stroke-width:1.5}.core{fill:#1b1740;stroke:#1b1740}
+      .t{font-size:15px;font-weight:600;fill:#1b1740}.s{font-size:12px;fill:#5d5a78}.w{fill:#fff}.ws{fill:#cfc9ee}
+      .l{stroke:#5b4bc4;stroke-width:2;fill:none}.lab{font-size:11.5px;fill:#5b4bc4;font-weight:600}
+    </style>
+  </defs>
+  <rect class="bg" width="900" height="420" rx="14"/>
+  <text x="30" y="38" class="t" style="font-size:18px">Connect: how a scan reaches the owner</text>
+
+  <rect class="box" x="30" y="70" width="190" height="64" rx="10"/><text x="125" y="98" text-anchor="middle" class="t">Stranger's phone</text><text x="125" y="118" text-anchor="middle" class="s">web/index.html, no app</text>
+  <rect class="box" x="30" y="170" width="190" height="64" rx="10"/><text x="125" y="198" text-anchor="middle" class="t">Family's browser</text><text x="125" y="218" text-anchor="middle" class="s">web/trip.html, live trip</text>
+  <rect class="box" x="30" y="320" width="190" height="64" rx="10"/><text x="125" y="348" text-anchor="middle" class="t">Owner's app</text><text x="125" y="368" text-anchor="middle" class="s">Flutter, Android</text>
+
+  <rect class="core" x="340" y="70" width="200" height="164" rx="12"/>
+  <text x="440" y="106" text-anchor="middle" class="t w">Edge functions</text>
+  <text x="440" y="134" text-anchor="middle" class="s ws">scan: the only door</text>
+  <text x="440" y="154" text-anchor="middle" class="s ws">plate check, rate limits</text>
+  <text x="440" y="174" text-anchor="middle" class="s ws">salted IP hashes</text>
+  <text x="440" y="194" text-anchor="middle" class="s ws">blocked senders dropped</text>
+  <text x="440" y="214" text-anchor="middle" class="s ws">notify: society notices</text>
+
+  <rect class="box" x="660" y="70" width="210" height="164" rx="12"/>
+  <text x="765" y="106" text-anchor="middle" class="t">Postgres + Storage</text>
+  <text x="765" y="134" text-anchor="middle" class="s">row-level security</text>
+  <text x="765" y="154" text-anchor="middle" class="s">default grants revoked,</text>
+  <text x="765" y="174" text-anchor="middle" class="s">added back per column</text>
+  <text x="765" y="204" text-anchor="middle" class="s">realtime changes</text>
+
+  <rect class="box" x="340" y="320" width="200" height="64" rx="10"/><text x="440" y="348" text-anchor="middle" class="t">FCM push</text><text x="440" y="368" text-anchor="middle" class="s">_shared/push.ts</text>
+
+  <path class="l" d="M220 102 H340" marker-end="url(#a)"/><text x="280" y="94" text-anchor="middle" class="lab">scan</text>
+  <path class="l" d="M220 202 H300 Q340 202 340 202" marker-end="url(#a)"/>
+  <path class="l" d="M540 152 H660" marker-end="url(#a)"/><text x="600" y="144" text-anchor="middle" class="lab">service role</text>
+  <path class="l" d="M440 234 V320" marker-end="url(#a)"/><text x="450" y="282" class="lab">on new alert</text>
+  <path class="l" d="M340 352 H220" marker-end="url(#a)"/><text x="280" y="344" text-anchor="middle" class="lab">push</text>
+  <path class="l" d="M765 234 V402 H125 V384" marker-end="url(#a)" style="stroke-dasharray:5 4"/><text x="640" y="394" text-anchor="middle" class="lab">REST + RLS + realtime to the app</text>
+  <text x="30" y="424" class="s" style="display:none">Strangers never touch tables. Owners read and write only their own rows.</text>
+</svg>
