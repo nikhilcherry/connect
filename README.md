@@ -1,5 +1,7 @@
 # Connect
 
+![license](https://img.shields.io/badge/license-MIT-lightgrey) ![platform](https://img.shields.io/badge/Android-Flutter-02569B) ![backend](https://img.shields.io/badge/backend-Supabase-3ecf8e) ![cost](https://img.shields.io/badge/running%20cost-%E2%82%B90-3fb950)
+
 **Anyone can reach you about your car, without either side sharing a phone number.**
 
 A QR tag on the windshield turns "whose car is this?" into a private two-way chat. A stranger scans it with any phone camera, picks what's wrong (blocking a gate, lights on, being towed, an accident), proves they're standing at the car, and the owner and their family get the message instantly. Around that core, the app gives owners reasons to open it every week: parking, renewals, fuel and service logs, family safety and live trip sharing.
